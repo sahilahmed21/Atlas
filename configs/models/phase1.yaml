@@ -1,0 +1,11 @@
+model_id: TinyLlama/TinyLlama-1.1B-Chat-v1.0
+revision: main
+dtype: float16
+# Laptop 3050 (~4GB): prefer 0.5B–1.1B. If OOM at N=1, switch to:
+# model_id: Qwen/Qwen2.5-0.5B-Instruct
+prompt_template: "Summarize in one sentence: Atlas is a constrained-hardware LLM serving platform."
+max_new_tokens_sweep: [32, 128]
+concurrency_sweep: [1, 2, 4, 8]
+# Stop when status=oom or latency > cliff_factor * baseline_n1
+cliff_factor: 5.0
+hardware_label: laptop-3050  # or colab-t4

@@ -1,0 +1,29 @@
+.venv/
+uv.toml.local
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Large / local artifacts (keep CSV small; ignore huge dumps)
+results/**/*.pt
+results/**/*.bin
+results/**/*.safetensors
+results/**/*.mp4
+*.ckpt
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

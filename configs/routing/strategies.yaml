@@ -1,0 +1,5 @@
+# Placeholder — Phase 4–5
+strategies:
+  - round_robin
+  - least_load
+  - prefix_aware

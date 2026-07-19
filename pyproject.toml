@@ -1,0 +1,31 @@
+[project]
+name = "atlas"
+version = "0.1.0"
+description = "Production-grade multi-tenant LLM serving behavior on constrained hardware"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.2",
+    "transformers>=4.40",
+    "accelerate>=0.30",
+    "psutil>=5.9",
+    "matplotlib>=3.8",
+    "pandas>=2.0",
+    "pyyaml>=6.0",
+    "tqdm>=4.66",
+]
+
+[dependency-groups]
+# Local Phase 1–2 tooling (lint/test later). Empty for now — reserved.
+dev = []
+# Colab / Kaggle GPU runtimes (Phase 3+). Prefer matching the runtime CUDA docs.
+gpu = [
+    "vllm",
+    "openai",
+    "httpx",
+    "prometheus-client",
+]
+
+[tool.uv]
+package = false
+default-groups = ["dev"]
