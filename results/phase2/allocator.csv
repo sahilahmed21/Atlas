@@ -1,0 +1,13 @@
+design,request_id,max_tokens,used_tokens,reserved_tokens,reserved_bytes,used_bytes,waste_bytes,outcome,notes
+contiguous,r0,512,40,512,6291456,491520,5799936,ok,reserve_max_len
+contiguous,r1,512,200,512,6291456,2457600,3833856,ok,reserve_max_len
+contiguous,r2,2048,100,2048,25165824,1228800,23937024,ok,reserve_max_len
+contiguous,r3,2048,1800,2048,25165824,22118400,3047424,ok,reserve_max_len
+contiguous,r4,128,128,128,1572864,1572864,0,ok,reserve_max_len
+contiguous,r5,1024,16,1024,12582912,196608,12386304,ok,reserve_max_len
+paged,r0,512,40,48,589824,491520,98304,ok,block_size=16; blocks=3
+paged,r1,512,200,208,2555904,2457600,98304,ok,block_size=16; blocks=13
+paged,r2,2048,100,112,1376256,1228800,147456,ok,block_size=16; blocks=7
+paged,r3,2048,1800,1808,22216704,22118400,98304,ok,block_size=16; blocks=113
+paged,r4,128,128,128,1572864,1572864,0,ok,block_size=16; blocks=8
+paged,r5,1024,16,16,196608,196608,0,ok,block_size=16; blocks=1
