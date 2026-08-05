@@ -7,3 +7,4 @@ Architecture Decision Records. Short, immutable once accepted (supersede with a 
 | [0001](0001-constraint-framing.md) | Constraint framing drives scope | Accepted |
 | [0002](0002-repo-layout.md) | fundamentals vs platform split | Accepted |
 | [0003](0003-free-path-replicas.md) | Time-sliced / sequential replicas | Accepted |
+| [0004](0004-phase2-cpu-sims.md) | Phase 2 as CPU teaching simulations | Accepted |

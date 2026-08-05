@@ -1,0 +1,5 @@
+timestamp,hardware,model,n_concurrent,prompt_tokens,max_new_tokens,ttft_ms,total_ms,tokens_per_s,peak_vram_mb,status,notes
+2026-07-27T20:09:24Z,laptop-3050,Qwen/Qwen2.5-0.5B-Instruct,1,23,32,1670.764,1670.764,19.153,969.2,ok,ttft_proxy=total
+2026-07-27T20:09:27Z,laptop-3050,Qwen/Qwen2.5-0.5B-Instruct,2,23,32,2614.437,2614.437,12.240,988.3,ok,ttft_proxy=total
+2026-07-27T20:09:31Z,laptop-3050,Qwen/Qwen2.5-0.5B-Instruct,4,23,32,4405.102,4405.102,7.265,1001.8,ok,ttft_proxy=total
+2026-07-27T20:09:41Z,laptop-3050,Qwen/Qwen2.5-0.5B-Instruct,8,23,32,9242.146,9242.146,3.462,1042.9,ok,ttft_proxy=total; latency_cliff>5.0x_n1; cliff_stop=1

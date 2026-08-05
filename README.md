@@ -74,7 +74,7 @@ Phase 3+ GPU stack: `uv sync --group gpu`
 ## Status
 
 - [x] Phase 0 skeleton + docs library
-- [ ] Phase 1 memory math + naive baseline
+- [x] Phase 1 memory math + naive baseline
 - [ ] Phase 2 toy mechanisms
 - [ ] Phase 3 vLLM reconciliation
 - [ ] Phase 4 platform + router

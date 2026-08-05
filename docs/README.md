@@ -12,4 +12,5 @@
 | [runbooks/](runbooks/) | uv, local Phase 1, Colab/Kaggle |
 | [pitch/](pitch/) | Resume / interview |
 
-**Start work:** [phases/phase-1/START_HERE.md](phases/phase-1/START_HERE.md)
+**Current work:** [phases/phase-2/](phases/phase-2/) — Phase 1 is complete; its measured
+baseline and limits are recorded in [phase-1](phases/phase-1/).

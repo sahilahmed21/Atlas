@@ -1,8 +1,10 @@
-model_id: TinyLlama/TinyLlama-1.1B-Chat-v1.0
-revision: main
+# Local checkpoint for laptop 3050 (~4GB). TinyLlama-1.1B OOMs at load
+# (weights ~2.05 GiB + CUDA allocator warmup leave almost no headroom).
+model_id: models/Qwen2.5-0.5B-Instruct
+hub_model_id: Qwen/Qwen2.5-0.5B-Instruct
+# Pinned commit (not floating main) for reproducibility
+revision: 7ae557604adf67be50417f59c2c2f167def9a775
 dtype: float16
-# Laptop 3050 (~4GB): prefer 0.5B–1.1B. If OOM at N=1, switch to:
-# model_id: Qwen/Qwen2.5-0.5B-Instruct
 prompt_template: "Summarize in one sentence: Atlas is a constrained-hardware LLM serving platform."
 max_new_tokens_sweep: [32, 128]
 concurrency_sweep: [1, 2, 4, 8]

@@ -1,8 +1,10 @@
 # Phase 2 — Toy mechanisms
 
-**Status:** Blocked until Phase 1 AC pass  
+**Status:** Ready — Phase 1 AC-001–AC-004 are evidenced in the committed docs and artifacts
 **Hardware:** Laptop  
 **Eye-stopper:** None new — instruments that make Phase 3 reconciliation honest
+
+**Plan:** [`PLAN.md`](PLAN.md) · **Architecture:** [`ARCHITECTURE.md`](ARCHITECTURE.md) · **ADR:** [`0004`](../../decisions/0004-phase2-cpu-sims.md)
 
 ## Subsystems (standalone sims)
 
@@ -28,8 +30,8 @@
 - [ ] Doc: `docs/phases/phase-2/03_prefix_cache.md`
 
 ### 2.4 Fundamentals check
-- [ ] For each toy, one paragraph: failure mode from Phase 1 math, not a blog paraphrase
-- [ ] `docs/phases/phase-2/FUNDAMENTALS_CHECK.md`
+- [x] For each toy, define the Phase 1 evidence boundary and mechanism; results remain pending
+- [x] `docs/phases/phase-2/FUNDAMENTALS_CHECK.md`
 
 ## Context
 

@@ -1,0 +1,2 @@
+timestamp,hardware,model,n_concurrent,prompt_tokens,max_new_tokens,ttft_ms,total_ms,tokens_per_s,peak_vram_mb,status,notes
+2026-07-27T20:08:55Z,laptop-3050,Qwen/Qwen2.5-0.5B-Instruct,1,23,32,1590.582,1590.582,20.118,969.2,ok,ttft_proxy=total
