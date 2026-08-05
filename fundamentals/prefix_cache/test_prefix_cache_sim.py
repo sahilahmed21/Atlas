@@ -1,6 +1,6 @@
 """Phase 2.3 — token-id prefix cache guarantees (TDD)."""
 
-from sim import (
+from prefix_cache_sim import (
     SHARED_PREFIX_LEN,
     run_cache,
     shared_prefix_traffic,

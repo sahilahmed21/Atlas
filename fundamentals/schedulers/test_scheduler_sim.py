@@ -1,6 +1,6 @@
 """Phase 2.2 — static vs continuous scheduler guarantees (TDD)."""
 
-from sim import (
+from scheduler_sim import (
     CAPACITY,
     DEFAULT_TRACE,
     STATIC_BATCH,

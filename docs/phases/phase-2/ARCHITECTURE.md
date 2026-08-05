@@ -1,6 +1,6 @@
 # Phase 2 — Architecture
 
-**Status:** Planned (sims not implemented yet)  
+**Status:** Done (sims implemented)  
 **Audience:** Implementers of Phase 2 toys; Phase 3 readers comparing concepts to vLLM  
 **Related:** [`PLAN.md`](PLAN.md) · [`FUNDAMENTALS_CHECK.md`](FUNDAMENTALS_CHECK.md) · [ADR 0004](../../decisions/0004-phase2-cpu-sims.md)
 
@@ -145,8 +145,8 @@ Traces must be **deterministic** (fixed lists and/or seeded generators recorded 
 
 ## Exit criteria (phase-level)
 
-- [ ] Three packages under `fundamentals/{allocators,schedulers,prefix_cache}/` runnable via `uv run`
-- [ ] Three result artifacts under `results/phase2/`
-- [ ] Measured sections filled in `01_` / `02_` / `03_`
-- [ ] `PLAN.md` / `README.md` checkboxes for 2.1–2.3 marked done
-- [ ] Claims in docs match [G4](#goals) (no Phase 1 VRAM/tok/s overclaim)
+- [x] Three packages under `fundamentals/{allocators,schedulers,prefix_cache}/` runnable via `uv run`
+- [x] Three result artifacts under `results/phase2/`
+- [x] Measured sections filled in `01_` / `02_` / `03_`
+- [x] `PLAN.md` / `README.md` checkboxes for 2.1–2.3 marked done
+- [x] Claims in docs match [G4](#goals) (no Phase 1 VRAM/tok/s overclaim)

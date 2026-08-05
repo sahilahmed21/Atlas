@@ -37,6 +37,16 @@ These limits match [vLLM's Automatic Prefix Caching documentation](https://docs.
 
 ## Measured sim result
 
-**Pending implementation and run.** Save a reproducible trace and report requests, hits, misses,
-cacheable prefix length, full-prefill tokens, and avoided-prefill tokens. Do not use a text-prefix
-match as a proxy for a token-prefix hit.
+**Simulated.** Token ids only (not raw prompt text). Cache keys the full shared prefix
+length **23** (teaching simplification — not vLLM block-aligned APC pages).
+
+| Traffic | Hits | Misses | Prefill tokens charged | Avoided prefill tokens |
+| --- | --- | --- | --- | --- |
+| Shared prefix (8 prompts) | **7** | **1** | 31 | **161** (= 7 × 23) |
+| Unique prefixes (8 prompts) | **0** | **8** | 192 | **0** |
+
+Artifact: `results/phase2/prefix_cache.csv`  
+Reproduce: `uv run python fundamentals/prefix_cache/prefix_cache_sim.py`  
+Tests: `uv run pytest fundamentals/prefix_cache`
+
+Prefill accounting only — no decode-latency claim. Eviction not implemented (clear = cold cache).

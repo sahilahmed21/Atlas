@@ -1,0 +1,17 @@
+traffic,request_id,prompt_tokens,hit_len,prefill_tokens,outcome,hits_total,misses_total,full_prefill_tokens,avoided_prefill_tokens,cacheable_prefix_len
+shared_prefix,r0,24,0,24,miss,7,1,31,161,23
+shared_prefix,r1,24,23,1,hit,7,1,31,161,23
+shared_prefix,r2,24,23,1,hit,7,1,31,161,23
+shared_prefix,r3,24,23,1,hit,7,1,31,161,23
+shared_prefix,r4,24,23,1,hit,7,1,31,161,23
+shared_prefix,r5,24,23,1,hit,7,1,31,161,23
+shared_prefix,r6,24,23,1,hit,7,1,31,161,23
+shared_prefix,r7,24,23,1,hit,7,1,31,161,23
+unique_prefix,r0,24,0,24,miss,0,8,192,0,23
+unique_prefix,r1,24,0,24,miss,0,8,192,0,23
+unique_prefix,r2,24,0,24,miss,0,8,192,0,23
+unique_prefix,r3,24,0,24,miss,0,8,192,0,23
+unique_prefix,r4,24,0,24,miss,0,8,192,0,23
+unique_prefix,r5,24,0,24,miss,0,8,192,0,23
+unique_prefix,r6,24,0,24,miss,0,8,192,0,23
+unique_prefix,r7,24,0,24,miss,0,8,192,0,23

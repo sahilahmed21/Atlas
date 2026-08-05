@@ -75,7 +75,7 @@ Phase 3+ GPU stack: `uv sync --group gpu`
 
 - [x] Phase 0 skeleton + docs library
 - [x] Phase 1 memory math + naive baseline
-- [ ] Phase 2 toy mechanisms
+- [x] Phase 2 toy mechanisms
 - [ ] Phase 3 vLLM reconciliation
 - [ ] Phase 4 platform + router
 - [ ] Phase 5 routing experiment

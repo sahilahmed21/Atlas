@@ -34,7 +34,7 @@ manager.
 
 ## Measured sim result
 
-**Simulated** (not Phase 1 GPU). Trace: `DEFAULT_TRACE` in `fundamentals/allocators/sim.py`
+**Simulated** (not Phase 1 GPU). Trace: `DEFAULT_TRACE` in `fundamentals/allocators/allocator_sim.py`
 (`bytes_per_token=12288`, `block_size=16`).
 
 | Design | Total used bytes | Total reserved bytes | Total waste bytes |
@@ -46,7 +46,7 @@ Paged waste is ~1% of contiguous waste on this trace because contiguous reserves
 request's `max_len` while paged reserves `ceil(used/16)*16` tokens.
 
 Artifact: `results/phase2/allocator.csv`  
-Reproduce: `uv run python fundamentals/allocators/sim.py`  
+Reproduce: `uv run python fundamentals/allocators/allocator_sim.py`  
 Tests: `uv run pytest fundamentals/allocators`
 
 **Phase 1 measured** peak VRAM (+73.7 MB) remains an aggregate GPU metric and is **not**

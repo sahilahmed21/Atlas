@@ -12,5 +12,5 @@
 | [runbooks/](runbooks/) | uv, local Phase 1, Colab/Kaggle |
 | [pitch/](pitch/) | Resume / interview |
 
-**Current work:** [phases/phase-2/](phases/phase-2/) — Phase 1 is complete; its measured
-baseline and limits are recorded in [phase-1](phases/phase-1/).
+**Current work:** [phases/phase-3/](phases/phase-3/) — Phase 2 toys are done; measured Phase 1–2
+artifacts live under [phase-1](phases/phase-1/) and [phase-2](phases/phase-2/).

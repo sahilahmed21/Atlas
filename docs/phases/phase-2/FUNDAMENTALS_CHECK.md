@@ -18,6 +18,6 @@ For each mechanism: exact failure mode (from Phase 1), mechanism, what it does *
 
 ## Evidence boundary
 
-Phase 2 has **not** run yet: `fundamentals/allocators/`, `fundamentals/schedulers/`, and
-`fundamentals/prefix_cache/` do not exist in the repository. The statements above define the
-mechanisms and measurement boundaries; they are not simulation results.
+Phase 2 sims are implemented under `fundamentals/{allocators,schedulers,prefix_cache}/`.
+Results live in `results/phase2/`. Mechanism boundaries above still apply: do not claim
+these sims reproduce Phase 1 GPU peak VRAM or tokens/s.

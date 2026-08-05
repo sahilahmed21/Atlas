@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sim import (  # type: ignore[import-not-found] — sibling module under fundamentals/allocators
+from allocator_sim import (
     BYTES_PER_TOKEN,
     BLOCK_SIZE,
     DEFAULT_TRACE,
