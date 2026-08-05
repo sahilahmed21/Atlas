@@ -37,5 +37,20 @@ Phase 1 tokens/s measurement.
 
 ## Measured sim result
 
-**Pending implementation and run.** The result must identify the arrival distribution/seed, request
-length trace, capacity, static timeout, and batch/token budget so the comparison is reproducible.
+**Simulated** (CPU ticks). Trace: `DEFAULT_TRACE` in `fundamentals/schedulers/sim.py`
+(`capacity=4`, static `batch_size=4`, `timeout=5`).
+
+| Design | Busy ticks | Idle ticks | Busy fraction | Mean completion latency (ticks) | Work completed |
+| --- | --- | --- | --- | --- | --- |
+| Static | (see CSV) | (see CSV) | **0.3846** | **13.50** | 56 |
+| Continuous | (see CSV) | (see CSV) | **0.5417** | **7.00** | 56 |
+
+Continuous keeps a higher busy fraction and lower mean completion latency on this staggered
+arrival pattern because it admits work at step boundaries instead of waiting for a full batch
+or timeout.
+
+Artifact: `results/phase2/scheduler.csv`  
+Reproduce: `uv run python fundamentals/schedulers/sim.py`  
+Tests: `uv run pytest fundamentals/schedulers`
+
+These busy-fraction units are **not** Phase 1 tokens/s (27.7 at N=8).

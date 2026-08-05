@@ -1,0 +1,3 @@
+design,completed,busy_ticks,idle_ticks,total_ticks,busy_fraction,mean_completion_latency,work_completed,capacity,batch_size,timeout,trace
+static,8,20,32,52,0.3846,13.50,56,4,4,5,DEFAULT_TRACE
+continuous,8,26,22,48,0.5417,7.00,56,4,,,DEFAULT_TRACE
