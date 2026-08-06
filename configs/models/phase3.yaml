@@ -1,0 +1,11 @@
+# Phase 3 — vLLM load on Colab/Kaggle T4 (same shape as Phase 1).
+# Pin must match fundamentals/experiments/vllm_load.py::PINNED_VLLM_VERSION
+hub_model_id: Qwen/Qwen2.5-0.5B-Instruct
+revision: 7ae557604adf67be50417f59c2c2f167def9a775
+dtype: float16
+prompt_template: "Summarize in one sentence: Atlas is a constrained-hardware LLM serving platform."
+max_new_tokens_sweep: [32]
+concurrency_sweep: [1, 2, 4, 8]
+cliff_factor: 5.0
+hardware_label: colab-t4
+vllm_version: "0.26.0"
