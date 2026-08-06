@@ -1,6 +1,8 @@
 """Offline contract tests for the Phase 3 vLLM load harness (no GPU)."""
 
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -65,3 +67,72 @@ def test_load_phase3_config_requires_same_revision_keys(tmp_path):
     assert cfg["revision"].startswith("7ae5576")
     assert cfg["concurrency_sweep"] == [1, 2, 4, 8]
     assert cfg["vllm_version"] == "0.26.0"
+
+
+def test_make_prompts_match_phase1_unique_suffixes():
+    from vllm_load import make_prompts
+
+    prompts = make_prompts("Summarize Atlas.", 3)
+
+    assert prompts == [
+        "Summarize Atlas. [req=0]",
+        "Summarize Atlas. [req=1]",
+        "Summarize Atlas. [req=2]",
+    ]
+
+
+def _fake_output(prompt: str, prompt_tokens: int = 24, new_tokens: int = 32):
+    return SimpleNamespace(
+        prompt=prompt,
+        prompt_token_ids=list(range(prompt_tokens)),
+        outputs=[SimpleNamespace(token_ids=list(range(new_tokens)))],
+    )
+
+
+class _FakeLLM:
+    """Records generate() calls — must be one batched call for continuous batching."""
+
+    def __init__(self):
+        self.calls: list[list[str]] = []
+
+    def generate(self, prompts, sampling_params=None, **kwargs):
+        batch = list(prompts)
+        self.calls.append(batch)
+        return [_fake_output(p) for p in batch]
+
+
+def test_run_concurrent_single_batched_generate_with_unique_prompts():
+    from vllm_load import run_concurrent
+
+    llm = _FakeLLM()
+    metrics = run_concurrent(llm, "Summarize Atlas.", n=4, max_new_tokens=32)
+
+    assert len(llm.calls) == 1, "must use one generate() for continuous batching"
+    assert llm.calls[0] == [
+        "Summarize Atlas. [req=0]",
+        "Summarize Atlas. [req=1]",
+        "Summarize Atlas. [req=2]",
+        "Summarize Atlas. [req=3]",
+    ]
+    assert metrics["status"] == "ok"
+    assert metrics["prompt_tokens"] == 24
+    assert metrics["total_ms"] is not None
+    assert "vram_source=nvml" in metrics["notes"]
+    assert "ttft_proxy=batch_wall" in metrics["notes"]
+
+
+def test_peak_vram_mb_uses_nvml_not_torch(monkeypatch):
+    from vllm_load import peak_vram_mb
+
+    fake_pynvml = MagicMock()
+    fake_pynvml.nvmlDeviceGetMemoryInfo.return_value = SimpleNamespace(
+        used=2 * 1024**3
+    )
+    monkeypatch.setitem(__import__("sys").modules, "pynvml", fake_pynvml)
+
+    # If torch path were used, this would matter; NVML path must win.
+    used = peak_vram_mb()
+
+    assert used == pytest.approx(2048.0)
+    fake_pynvml.nvmlInit.assert_called()
+    fake_pynvml.nvmlDeviceGetHandleByIndex.assert_called_with(0)
