@@ -1,34 +1,37 @@
 # TDD evidence — Phase 3 vLLM reconciliation (offline slice)
 
 **Source plan:** [`docs/phases/phase-3/README.md`](../phases/phase-3/README.md)  
-**Acceptance:** [`docs/phases/phase-3/ACCEPTANCE.md`](../phases/phase-3/ACCEPTANCE.md)
+**Acceptance:** [`docs/phases/phase-3/ACCEPTANCE.md`](../phases/phase-3/ACCEPTANCE.md)  
+**Review fixes:** Critical/High from Phase 0–3 code review (CB batching, suffixes, NVML, hardware labels, gitignore, install docs)
 
 ## User journeys
 
 1. As an engineer, I want an overlay plotter that joins Phase 1 + Phase 3 CSVs so the eye-stopper chart cannot invent missing vLLM points.
 2. As an engineer, I want the vLLM load harness to share Phase 1’s CSV contract and embed the pinned version in every row.
 3. As an engineer, I want a source diff against tag `v0.26.0` so Phase 2 toys are not oversold as APC.
+4. As an engineer, I want Phase 3 concurrency to be one batched `generate([p0..pN-1])` with Phase 1 `[req=i]` suffixes so the chart measures continuous batching, not thread queueing.
+5. As an engineer, I want NVML VRAM and labeled cross-hardware overlays so meters and hosts stay honest.
 
 ## Task report
 
-### Task: Overlay join + plot (AC-002)
+### Task: Overlay join + plot (AC-002) + hardware honesty
 
-- **Summary:** `pair_by_concurrency` intersects ok rows; `plot_overlay` writes PNG; missing vLLM CSV → `FileNotFoundError`.
-- **RED:** `uv run pytest fundamentals/experiments/test_plot_naive_vs_vllm.py -q` → `ModuleNotFoundError: No module named 'plot_naive_vs_vllm'` (4 failed)
-- **GREEN:** same command → `4 passed`
-- **Guaranteed:** Only overlapping concurrency points are paired; absence of vLLM CSV does not fabricate rows.
+- **Summary:** Pairs carry `naive_hardware` / `vllm_hardware`; `overlay_title` marks cross-hardware.
+- **RED (honesty):** missing keys / `overlay_title` ImportError / bare `models/` in gitignore
+- **GREEN:** `14 passed` in experiments Phase 3 tests; full fundamentals `25 passed`
+- **Guaranteed:** No fabricated vLLM rows; title always names both hardwares.
 
-### Task: Load harness contract (AC-003)
+### Task: Load harness contract (AC-003) + CB / NVML
 
-- **Summary:** `CSV_FIELDS` match Phase 1; `build_row` embeds `vllm=0.26.0`; pin assert rejects mismatches; config loader reads `phase3.yaml` keys.
-- **RED:** `ModuleNotFoundError: No module named 'vllm_load'` (4 failed)
-- **GREEN:** `4 passed`
-- **Guaranteed:** Offline schema/pin without importing a GPU runtime in the happy path of helpers.
+- **Summary:** `make_prompts` + single `llm.generate(prompts)`; `peak_vram_mb` via `pynvml`; notes `ttft_proxy=batch_wall; vram_source=nvml`.
+- **RED:** threaded path → 0 FakeLLM batched calls; torch VRAM path; no `make_prompts`
+- **GREEN:** FakeLLM receives exactly one call with `[req=0..3]`; NVML mock returns 2048 MB
+- **Guaranteed:** Offline CB contract without live GPU.
 
-### Task: Pin + source diff (AC-001, AC-004)
+### Task: Pin + install path (AC-001)
 
-- **Summary:** Pin `0.26.0` in harness + config + READING_LIST; Colab T4 uses `+cu129` wheel (verified against release assets). `pyproject.toml` `gpu` group left empty — declaring `vllm==0.26.0` breaks laptop `uv` resolve against the cu124 torch index (`torch==2.11.0` not on that index).
-- **Verification:** Manual review of READING_LIST + `02_source_diff.md`.
+- **Summary:** `gpu` group empty; runbooks/README/HANDOFF/verify script use `+cu129` + pin assert.
+- **Verification:** docs + `scripts/verify_wsl_vllm.py` imports `assert_runtime_vllm_matches_pin`.
 
 ### Task: GPU artifact (AC-005)
 
@@ -36,24 +39,28 @@
 
 ## Test specification
 
-| # | What is guaranteed | Test | Type | Result | Evidence |
-| --- | --- | --- | --- | --- | --- |
-| 1 | Naive/vLLM ok rows join on concurrency | `test_pair_by_concurrency_aligns_ok_rows` | unit | PASS | `uv run pytest fundamentals/experiments/test_plot_naive_vs_vllm.py` |
-| 2 | Missing side drops the point | `test_pair_by_concurrency_skips_points_missing_on_one_side` | unit | PASS | same |
-| 3 | Missing vLLM CSV raises | `test_missing_vllm_csv_raises` | unit | PASS | same |
-| 4 | Overlay writes non-empty PNG | `test_plot_writes_png` | unit | PASS | same |
-| 5 | CSV fields == Phase 1 | `test_csv_fields_match_phase1` | unit | PASS | `uv run pytest fundamentals/experiments/test_vllm_load.py` |
-| 6 | Row notes include pin | `test_build_row_embeds_pinned_vllm_version` | unit | PASS | same |
-| 7 | Runtime pin mismatch errors | `test_assert_runtime_vllm_matches_pin` | unit | PASS | same |
-| 8 | phase3.yaml keys load | `test_load_phase3_config_requires_same_revision_keys` | unit | PASS | same |
+| # | What is guaranteed | Test | Result |
+| --- | --- | --- | --- |
+| 1–4 | Overlay join / missing CSV / PNG / hardware fields | `test_plot_naive_vs_vllm.py` | PASS |
+| 5 | Cross-hardware title warns | `test_overlay_title_labels_cross_hardware` | PASS |
+| 6 | Same-hardware title has no cross warning | `test_overlay_title_same_hardware_has_no_cross_warning` | PASS |
+| 7 | `/models/` only (not bare `models/`) | `test_gitignore_models_rule_is_repo_root_only` | PASS |
+| 8–11 | CSV/pin/config helpers | `test_vllm_load.py` (original) | PASS |
+| 12 | Unique `[req=i]` prompts | `test_make_prompts_match_phase1_unique_suffixes` | PASS |
+| 13 | One batched generate | `test_run_concurrent_single_batched_generate_with_unique_prompts` | PASS |
+| 14 | NVML VRAM path | `test_peak_vram_mb_uses_nvml_not_torch` | PASS |
+
+Evidence command: `uv run pytest fundamentals/experiments fundamentals/allocators fundamentals/schedulers fundamentals/prefix_cache -q` → `25 passed`.
 
 ## Coverage and known gaps
 
-No coverage tool. Deliberate gaps: live `LLM.generate` path, ThreadPoolExecutor concurrency under GPU, streaming TTFT (documented proxy), AC-005 GPU artifacts.
+No coverage tool. Still untested live: real `LLM.generate` on GPU, NVML on host without GPU (returns None), AC-005 artifacts. Streaming TTFT still a documented proxy (`batch_wall`).
 
 ## Merge evidence / checkpoints
 
 | Commit message | Stage |
 | --- | --- |
-| `test: add Phase 3 overlay and vLLM load reproducers (RED)` | RED |
-| `feat: Phase 3 overlay plotter, vLLM harness, pin 0.26.0 (GREEN)` | GREEN (this close-out) |
+| `test: add Phase 3 overlay and vLLM load reproducers (RED)` | RED (initial) |
+| `feat: Phase 3 overlay plotter, vLLM harness, pin 0.26.0 (GREEN)` | GREEN (initial) |
+| `test: reproduce Phase 3 CB/VRAM/hardware honesty bugs (RED)` | RED (review fixes) |
+| `fix: Phase 3 batch generate, NVML VRAM, hardware honesty (GREEN)` | GREEN (review fixes) |

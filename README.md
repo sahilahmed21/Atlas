@@ -70,7 +70,7 @@ uv run python -c "import torch; print(torch.__version__)"
 # docs/phases/phase-1/START_HERE.md
 ```
 
-Phase 3+ GPU stack: `uv sync --group gpu`
+Phase 3 vLLM: pin `0.26.0` via Colab `+cu129` wheel — see `docs/runbooks/COLAB_KAGGLE.md` (not `uv sync --group gpu`).
 ## Status
 
 - [x] Phase 0 skeleton + docs library

@@ -105,7 +105,14 @@ def test_run_concurrent_single_batched_generate_with_unique_prompts():
     from vllm_load import run_concurrent
 
     llm = _FakeLLM()
-    metrics = run_concurrent(llm, "Summarize Atlas.", n=4, max_new_tokens=32)
+    # sampling_params injected so the test never imports real vLLM
+    metrics = run_concurrent(
+        llm,
+        "Summarize Atlas.",
+        n=4,
+        max_new_tokens=32,
+        sampling_params=MagicMock(),
+    )
 
     assert len(llm.calls) == 1, "must use one generate() for continuous batching"
     assert llm.calls[0] == [

@@ -1,7 +1,8 @@
 """Phase 3 — overlay Phase 1 naive HF vs Phase 3 vLLM latency curves.
 
 Reads two CSVs with the Phase 1 schema; writes results/phase3/naive_vs_vllm.png.
-Does not invent rows — missing CSVs raise.
+Does not invent rows — missing CSVs raise. Hardware labels are always shown;
+cross-host overlays are marked so 3050 vs T4 cannot look same-GPU.
 """
 
 from __future__ import annotations
@@ -20,6 +21,13 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_NAIVE = ROOT / "results" / "phase1" / "naive_load.csv"
 DEFAULT_VLLM = ROOT / "results" / "phase3" / "vllm_load.csv"
 DEFAULT_OUT = ROOT / "results" / "phase3" / "naive_vs_vllm.png"
+
+
+def overlay_title(model: str, naive_hardware: str, vllm_hardware: str) -> str:
+    hw = f"naive={naive_hardware} · vllm={vllm_hardware}"
+    if naive_hardware != vllm_hardware:
+        hw += " · cross-hardware (not same-GPU)"
+    return f"Naive HF vs vLLM\n{model}\n{hw}"
 
 
 def pair_by_concurrency(
@@ -57,19 +65,23 @@ def pair_by_concurrency(
                 "vllm_total_ms": vllm[n]["total_ms"],
                 "naive_peak_vram_mb": naive[n]["peak_vram_mb"],
                 "vllm_peak_vram_mb": vllm[n]["peak_vram_mb"],
+                "naive_hardware": naive[n]["hardware"],
+                "vllm_hardware": vllm[n]["hardware"],
             }
         )
     return pairs
 
 
 def plot_overlay(pairs: list[dict], out_path: Path, model: str) -> Path:
-    fig, (ax_lat, ax_vram) = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
+    naive_hw = pairs[0]["naive_hardware"] if pairs else "?"
+    vllm_hw = pairs[0]["vllm_hardware"] if pairs else "?"
+    fig, (ax_lat, ax_vram) = plt.subplots(2, 1, figsize=(8, 9), sharex=True)
     xs = [p["n_concurrent"] for p in pairs]
 
     ax_lat.plot(xs, [p["naive_total_ms"] for p in pairs], marker="o", label="naive HF")
     ax_lat.plot(xs, [p["vllm_total_ms"] for p in pairs], marker="o", label="vLLM")
-    ax_lat.set_title(f"Naive HF vs vLLM\n{model}")
-    ax_lat.set_ylabel("p50 request latency (ms)")
+    ax_lat.set_title(overlay_title(model, naive_hw, vllm_hw))
+    ax_lat.set_ylabel("p50 / batch-wall request latency (ms)")
     ax_lat.grid(alpha=0.3)
     ax_lat.legend(fontsize=8)
 
@@ -80,7 +92,7 @@ def plot_overlay(pairs: list[dict], out_path: Path, model: str) -> Path:
         xs, [p["vllm_peak_vram_mb"] for p in pairs], marker="s", label="vLLM"
     )
     ax_vram.set_xlabel("concurrent requests (N)")
-    ax_vram.set_ylabel("peak VRAM (MB)")
+    ax_vram.set_ylabel("peak / NVML-used VRAM (MB)")
     ax_vram.grid(alpha=0.3)
     ax_vram.legend(fontsize=8)
 
@@ -106,6 +118,12 @@ def main() -> int:
         raise SystemExit("no overlapping ok concurrency points to plot")
     out = plot_overlay(pairs, args.out, args.model)
     print(f"wrote {out} ({len(pairs)} points)")
+    if pairs[0]["naive_hardware"] != pairs[0]["vllm_hardware"]:
+        print(
+            "warning: cross-hardware overlay "
+            f"{pairs[0]['naive_hardware']} vs {pairs[0]['vllm_hardware']}",
+            flush=True,
+        )
     return 0
 
 

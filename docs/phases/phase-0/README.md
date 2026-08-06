@@ -24,7 +24,7 @@
 
 ### 0.4 Tooling
 - [ ] `uv sync` locally (Phase 1–2 deps from `pyproject.toml`)
-- [ ] Optional: `uv sync --group gpu` only on Colab/Kaggle
+- [ ] Optional: install pinned vLLM 0.26.0 on Colab/Kaggle (`+cu129` wheel) — not `uv sync --group gpu`
 
 ## Substeps log
 

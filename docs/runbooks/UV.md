@@ -23,10 +23,6 @@ uv run python fundamentals/experiments/naive_hf_load.py
 
 # Add a dependency (updates pyproject.toml + lockfile)
 uv add httpx
-uv add --group gpu prometheus-client
-
-# Phase 3+ on a CUDA machine / Colab with uv available
-uv sync --group gpu
 ```
 
 ## Dependency layout
@@ -34,18 +30,20 @@ uv sync --group gpu
 | Where | What |
 | --- | --- |
 | `[project].dependencies` | Local Phase 1–2 stack (torch, transformers, …) |
-| `[dependency-groups].dev` | Reserved for lint/test |
-| `[dependency-groups].gpu` | vLLM + serving clients (Colab/Kaggle) |
+| `[dependency-groups].dev` | pytest |
+| `[dependency-groups].gpu` | **Empty on purpose** — do not `uv sync --group gpu` for vLLM |
 
 Lockfile: `uv.lock` (commit it). Env: `.venv/` (gitignored; created by `uv sync`).
 
-## Colab / Kaggle
+## Colab / Kaggle (Phase 3 vLLM)
 
-If the runtime has no uv yet:
+Pin is `0.26.0` (`PINNED_VLLM_VERSION`). Install the wheel, then verify:
 
 ```bash
-pip install uv
-uv sync --group gpu
+pip install uv && uv sync
+# T4 / CUDA 12.x:
+pip install https://github.com/vllm-project/vllm/releases/download/v0.26.0/vllm-0.26.0+cu129-cp38-abi3-manylinux_2_28_x86_64.whl
+python scripts/verify_wsl_vllm.py
 ```
 
-Or follow current vLLM CUDA install notes, then `uv add --group gpu <package>` so the lockfile stays source of truth.
+See [`COLAB_KAGGLE.md`](COLAB_KAGGLE.md) and `docs/knowledge/vllm-internals/READING_LIST.md`.

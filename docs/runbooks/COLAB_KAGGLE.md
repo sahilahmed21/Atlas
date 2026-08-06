@@ -1,20 +1,23 @@
 # Runbook — Colab / Kaggle
 
-Uses **uv** for deps (same lockfile as local). Cheat sheet: [`UV.md`](UV.md).
+Uses **uv** for Phase 1–2 deps. Phase 3 vLLM is installed **separately** (pin `0.26.0`).
 
 1. Runtime → GPU (T4).  
-2. Clone or upload this repo (GitHub recommended once pushed).  
-3. Bootstrap uv if missing, then sync the GPU group:
-   ```bash
-   pip install uv   # bootstrap only — then uv owns the rest
-   uv sync --group gpu
-   ```
-   If vLLM needs a CUDA-specific wheel, follow current vLLM docs then `uv add --group gpu <pin>` so `uv.lock` stays canonical.  
-4. Set `hardware_label: colab-t4` in phase config.  
-5. Run with `uv run …`.  
-6. Save CSV downloads into `results/phaseN/` in the repo before the session dies.
+2. Clone or upload this repo.  
+3. Bootstrap Phase 1–2 deps if needed: `pip install uv && uv sync`  
+4. Install **pinned** vLLM 0.26.0:
+   - **T4 / CUDA 12.x drivers** (typical Colab/Kaggle):
+     ```bash
+     pip install https://github.com/vllm-project/vllm/releases/download/v0.26.0/vllm-0.26.0+cu129-cp38-abi3-manylinux_2_28_x86_64.whl
+     ```
+   - Linux with CUDA 13 runtime: `pip install vllm==0.26.0`  
+   - Do **not** use `uv sync --group gpu` — that group is empty (vLLM pin conflicts with this repo’s cu124 torch index on laptop resolve).  
+5. `python scripts/verify_wsl_vllm.py` — must print pin ok for `0.26.0`.  
+6. Set `hardware_label: colab-t4` in `configs/models/phase3.yaml`.  
+7. Run `python fundamentals/experiments/vllm_load.py` then `plot_naive_vs_vllm.py`.  
+8. Download `results/phase3/` before the session dies.
 
 ## Disconnect survival
 
-- Write CSV after every sweep step, not only at the end.  
+- CSV appends after every concurrency step.  
 - Prefer Drive mount or frequent download on Colab.

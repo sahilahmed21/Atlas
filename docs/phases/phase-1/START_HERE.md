@@ -72,7 +72,7 @@ pandas
 pyyaml
 ```
 
-Use **uv**: `uv sync` at repo root (deps in `pyproject.toml`). Heavy GPU deps: `uv sync --group gpu` on Colab/Kaggle. See `docs/runbooks/UV.md`.
+Use **uv**: `uv sync` at repo root (deps in `pyproject.toml`). Phase 3 vLLM: see `docs/runbooks/COLAB_KAGGLE.md` (pin 0.26.0 / `+cu129`). See `docs/runbooks/UV.md`.
 ---
 
 ## Context rules

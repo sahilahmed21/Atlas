@@ -1,7 +1,8 @@
 """Phase 3 — vLLM concurrent load sweep (same CSV contract as Phase 1).
 
-Offline-testable helpers live here. The GPU path (LLM.generate) runs on
-Colab/Kaggle/WSL after `uv sync --group gpu` (or the +cu129 wheel on T4).
+Concurrency = one offline LLM.generate([p0..pN-1]) so the engine continuous-
+batches (not N threaded single-prompt calls). Prompts use Phase 1 unique
+suffixes. VRAM is NVML used-bytes (not torch allocator).
 
 Protocol: docs/phases/phase-3/README.md
 """
@@ -10,10 +11,10 @@ from __future__ import annotations
 
 import argparse
 import csv
+import statistics
 import sys
 import time
 import traceback
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,6 +25,12 @@ DEFAULT_CONFIG = ROOT / "configs" / "models" / "phase3.yaml"
 DEFAULT_OUT = ROOT / "results" / "phase3" / "vllm_load.csv"
 
 PINNED_VLLM_VERSION = "0.26.0"
+
+# Colab/Kaggle T4 with CUDA 12.x drivers — default PyPI 0.26.0 wants CUDA 13.
+CU129_WHEEL = (
+    "https://github.com/vllm-project/vllm/releases/download/v0.26.0/"
+    "vllm-0.26.0+cu129-cp38-abi3-manylinux_2_28_x86_64.whl"
+)
 
 CSV_FIELDS = [
     "timestamp",
@@ -51,6 +58,11 @@ def assert_runtime_vllm_matches_pin(runtime_version: str) -> None:
         raise RuntimeError(
             f"runtime vLLM {runtime_version!r} != pinned {PINNED_VLLM_VERSION!r}"
         )
+
+
+def make_prompts(prompt_template: str, n: int) -> list[str]:
+    """Same unique-suffix shape as Phase 1 naive_hf_load.run_concurrent."""
+    return [f"{prompt_template} [req={i}]" for i in range(n)]
 
 
 def build_row(
@@ -92,7 +104,7 @@ def build_row(
 def append_csv(path: Path, row: dict) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    write_header = not path.exists()
+    write_header = not path.exists() or path.stat().st_size == 0
     with path.open("a", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
         if write_header:
@@ -101,88 +113,83 @@ def append_csv(path: Path, row: dict) -> None:
 
 
 def peak_vram_mb() -> float | None:
+    """Device memory in use via NVML — vLLM pools bypass torch's allocator."""
     try:
-        import torch
+        import pynvml
     except ImportError:
         return None
-    if not torch.cuda.is_available():
+    try:
+        pynvml.nvmlInit()
+        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+        info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+        return info.used / (1024**2)
+    except Exception:  # noqa: BLE001 — no GPU / driver
         return None
-    return torch.cuda.max_memory_allocated() / (1024**2)
 
 
-def reset_peak_vram() -> None:
-    try:
-        import torch
-    except ImportError:
-        return
-    if torch.cuda.is_available():
-        torch.cuda.reset_peak_memory_stats()
-        torch.cuda.empty_cache()
+def is_oom(exc: BaseException) -> bool:
+    if type(exc).__name__ in {"OutOfMemoryError", "TorchCudaOOMError"}:
+        return True
+    text = f"{type(exc).__name__}: {exc}".lower()
+    return "out of memory" in text or "cuda out of memory" in text
 
 
-def one_generate(llm, prompt: str, max_new_tokens: int) -> dict:
-    """Single offline LLM.generate(); TTFT recorded as total (proxy)."""
-    from vllm import SamplingParams
+def run_concurrent(
+    llm,
+    prompt_template: str,
+    n: int,
+    max_new_tokens: int,
+    sampling_params=None,
+) -> dict:
+    """One batched generate() — continuous batching — with Phase 1 unique prompts."""
+    prompts = make_prompts(prompt_template, n)
+    if sampling_params is None:
+        from vllm import SamplingParams
 
-    params = SamplingParams(max_tokens=max_new_tokens, temperature=0.0)
-    t0 = time.perf_counter()
-    outputs = llm.generate([prompt], params)
-    total_ms = (time.perf_counter() - t0) * 1000.0
-    out = outputs[0]
-    prompt_tokens = len(out.prompt_token_ids)
-    new_tokens = max(len(out.outputs[0].token_ids), 1)
-    return {
-        "prompt_tokens": prompt_tokens,
-        "total_ms": total_ms,
-        "ttft_ms": total_ms,  # ponytail: no streaming hook; document as proxy
-        "tokens_per_s": new_tokens / (total_ms / 1000.0),
-        "new_tokens": new_tokens,
-    }
-
-
-def run_concurrent(llm, prompt: str, n: int, max_new_tokens: int) -> dict:
-    reset_peak_vram()
-    errors: list[str] = []
-    totals: list[float] = []
-    prompt_tokens = 0
-    tok_rates: list[float] = []
-
-    def worker(_: int) -> dict:
-        return one_generate(llm, prompt, max_new_tokens)
+        sampling_params = SamplingParams(max_tokens=max_new_tokens, temperature=0.0)
 
     try:
-        with ThreadPoolExecutor(max_workers=n) as pool:
-            futs = [pool.submit(worker, i) for i in range(n)]
-            for fut in as_completed(futs):
-                metrics = fut.result()
-                totals.append(metrics["total_ms"])
-                tok_rates.append(metrics["tokens_per_s"])
-                prompt_tokens = metrics["prompt_tokens"]
+        t0 = time.perf_counter()
+        outputs = llm.generate(prompts, sampling_params)
+        wall_ms = (time.perf_counter() - t0) * 1000.0
     except Exception as exc:  # noqa: BLE001
-        errors.append(f"{type(exc).__name__}: {exc}")
-        text = str(exc).lower()
-        status = "oom" if "out of memory" in text or "cuda" in text and "memory" in text else "error"
         return {
-            "prompt_tokens": prompt_tokens,
+            "prompt_tokens": 0,
             "ttft_ms": None,
             "total_ms": None,
             "tokens_per_s": None,
             "peak_vram_mb": peak_vram_mb(),
-            "status": status,
-            "notes": "; ".join(errors),
+            "status": "oom" if is_oom(exc) else "error",
+            "notes": f"ttft_proxy=batch_wall; vram_source=nvml; {type(exc).__name__}: {exc}",
         }
 
-    # p50 of per-request totals (same philosophy as Phase 1 concurrent wall)
-    totals_sorted = sorted(totals)
-    mid = totals_sorted[len(totals_sorted) // 2]
+    if not outputs:
+        return {
+            "prompt_tokens": 0,
+            "ttft_ms": None,
+            "total_ms": None,
+            "tokens_per_s": None,
+            "peak_vram_mb": peak_vram_mb(),
+            "status": "error",
+            "notes": "ttft_proxy=batch_wall; vram_source=nvml; empty_outputs",
+        }
+
+    # Batch wall = time to serve N concurrent under CB (all admitted together).
+    # Per-request tok/s uses that shared wall (Phase 1 median of per-request rates).
+    rates = []
+    for out in outputs:
+        new_tokens = max(len(out.outputs[0].token_ids), 1)
+        rates.append(new_tokens / (wall_ms / 1000.0))
+    prompt_tokens = len(outputs[0].prompt_token_ids)
+
     return {
         "prompt_tokens": prompt_tokens,
-        "ttft_ms": mid,
-        "total_ms": mid,
-        "tokens_per_s": sum(tok_rates) / len(tok_rates),
+        "ttft_ms": wall_ms,
+        "total_ms": wall_ms,
+        "tokens_per_s": statistics.median(rates),
         "peak_vram_mb": peak_vram_mb(),
         "status": "ok",
-        "notes": "ttft_proxy=total",
+        "notes": "ttft_proxy=batch_wall; vram_source=nvml; batch_generate=1",
     }
 
 
@@ -211,11 +218,13 @@ def main() -> int:
         from vllm import LLM
     except ImportError as exc:
         print(
-            "vLLM not installed. On Colab/Kaggle T4 (CUDA 12.x drivers) prefer:\n"
-            "  pip install "
-            "https://github.com/vllm-project/vllm/releases/download/v0.26.0/"
-            "vllm-0.26.0+cu129-cp38-abi3-manylinux_2_28_x86_64.whl\n"
-            "Else: uv sync --group gpu  (Linux; default wheel may need CUDA 13)",
+            "vLLM not installed. Pin is 0.26.0.\n"
+            f"  Colab/Kaggle T4 (CUDA 12.x drivers):\n"
+            f"    pip install {CU129_WHEEL}\n"
+            "  Linux with CUDA 13 runtime:\n"
+            "    pip install vllm==0.26.0\n"
+            "  Do not use `uv sync --group gpu` — that group is empty "
+            "(pin conflicts with this repo's cu124 torch index).",
             file=sys.stderr,
         )
         print(exc, file=sys.stderr)
@@ -241,6 +250,15 @@ def main() -> int:
     )
     llm = LLM(model=model, revision=revision, dtype=dtype, trust_remote_code=False)
 
+    # Discard cold start / cudagraph capture from the timed sweep.
+    print("warmup batch generate…", flush=True)
+    try:
+        run_concurrent(llm, f"{prompt} [warmup]", 1, 8)
+    except Exception as exc:  # noqa: BLE001
+        print(f"warmup failed: {exc}", file=sys.stderr)
+        traceback.print_exc()
+        return 1
+
     baseline_n1_ms: dict[int, float] = {}
     stop_sweep = False
     for max_new_tokens in max_new_tokens_sweep:
@@ -259,7 +277,7 @@ def main() -> int:
                     "tokens_per_s": None,
                     "peak_vram_mb": peak_vram_mb(),
                     "status": "error",
-                    "notes": f"{type(exc).__name__}: {exc}",
+                    "notes": f"ttft_proxy=batch_wall; vram_source=nvml; {type(exc).__name__}: {exc}",
                 }
 
             if n == 1 and metrics["total_ms"] is not None and metrics["status"] == "ok":

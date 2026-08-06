@@ -22,7 +22,8 @@ results/**/*.bin
 results/**/*.safetensors
 results/**/*.mp4
 *.ckpt
-models/
+# Repo-root weights only — do NOT use bare `models/` (that ignores configs/models/).
+/models/
 
 # OS / IDE
 .DS_Store

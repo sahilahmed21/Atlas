@@ -8,8 +8,10 @@
 | Model | `Qwen/Qwen2.5-0.5B-Instruct` @ `7ae5576…` |
 | Naive baseline | `results/phase1/naive_load.csv` (laptop-3050) |
 | Expected vLLM hardware | `colab-t4` (or Kaggle T4) |
-| TTFT | Document as **proxy = total** unless streaming TTFT is instrumented |
-| Overlay command | `uv run python fundamentals/experiments/plot_naive_vs_vllm.py` (after CSV exists) |
+| TTFT | **proxy = batch wall** (`ttft_proxy=batch_wall`); not streaming TTFT |
+| VRAM | Phase 3: `vram_source=nvml` (used bytes); Phase 1: torch peak — not identical meters |
+| Concurrency | One `LLM.generate([p0..pN-1])` with `[req=i]` suffixes (not threaded singles) |
+| Overlay command | `uv run python fundamentals/experiments/plot_naive_vs_vllm.py` (after CSV exists; title labels hardware) |
 
 When the GPU run finishes, embed `results/phase3/naive_vs_vllm.png` here and fill:
 
