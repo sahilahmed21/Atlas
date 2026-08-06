@@ -1,13 +1,30 @@
 # Phase 3 — Toy vs vLLM source diff
 
-| Concept | Your toy | vLLM (file/version) | Match? |
+**Pinned version:** vLLM **0.26.0** (tag `v0.26.0`, released 2026-07-27).  
+Evidence: [release](https://github.com/vllm-project/vllm/releases/tag/v0.26.0), design doc at tag, reading list.
+
+| Concept | Your toy (Phase 2) | vLLM `v0.26.0` | Match? |
 | --- | --- | --- | --- |
-| Block allocation | Pending Phase 2 toy: on-demand fixed-size blocks plus logical-to-physical block table. | Not yet pinned or inspected. Current design reference: [PagedAttention docs](https://docs.vllm.ai/en/latest/design/paged_attention/). Record the installed version and exact source path during Phase 3. | Pending source read |
-| Scheduling | Pending Phase 2 sim: deterministic step admission and one service unit per active request. | Not yet pinned or inspected. Compare real token-budget/admission/preemption behavior rather than assuming a one-step toy is equivalent. | Pending source read |
-| Prefix / automatic prefix caching | Pending Phase 2 toy: longest exact token-id prefix; cacheable work is prefill only. | Not yet pinned or inspected. Current behavior reference: [Automatic Prefix Caching](https://docs.vllm.ai/en/latest/features/automatic_prefix_caching/). Record cache-block and hash semantics from the pinned source. | Pending source read |
+| Block allocation | Fixed-size blocks; paged reserves `ceil(used/block)*block`; per-request waste accounting (`fundamentals/allocators/allocator_sim.py`, `block_size=16`) | `vllm/v1/core/kv_cache_manager.py` + block pool / free queue; physical blocks with refcounts; allocation via `allocate_slots` / `get_computed_blocks` (see `docs/design/prefix_caching.md` @ tag) | **Partial** — same idea (fixed-size KV blocks + indirection), but vLLM is a shared pool with refcount + eviction, not per-request waste sums |
+| Scheduling | Discrete ticks; continuous admits up to capacity and advances every active request by 1 service unit (`scheduler_sim.py`) | `vllm/v1/core/sched/scheduler.py` — `schedule()` returns `{req_id: num_tokens}` per engine step (chunked prefill, decode=1, prefix hits, speculative budgets) | **Partial** — both are continuous-batching flavored; vLLM schedules **token budgets**, not toy “+1 per tick” |
+| Prefix / APC | SHA-256 of whole cacheable prefix (23 tokens); hit → charge suffix only; prefill accounting only (`prefix_cache_sim.py`) | Hash chain over **full blocks only**: `hash(parent_hash, block_tokens, extras)`; default `sha256` since v0.11; LRU free-queue eviction (`docs/design/prefix_caching.md` @ `v0.26.0`) | **No** at key granularity — toy is whole-prefix; vLLM is block-aligned APC |
+
+## 3 similarities
+
+1. **Paged KV blocks** — both treat KV memory as fixed-size blocks rather than one contiguous per-request reservation.
+2. **Continuous batching spirit** — both keep a running set of requests and admit work each step instead of only static full batches.
+3. **Prefix reuse is prefill-side** — both avoid recomputing shared prompt work; neither toy nor this phase claims a decode-speedup story from prefix hits alone.
+
+## 3 differences
+
+1. **Hash granularity** — toy hashes the entire 23-token prefix once; vLLM hashes **full blocks** with a parent-hash chain (partial blocks are not cacheable).
+2. **Shared pool + eviction** — vLLM uses a global block pool, refcounts, and LRU eviction from the free queue; the toy never evicts and never shares physical pages across a heap model.
+3. **Scheduler unit** — toy advances one abstract service unit per active request per tick; vLLM’s scheduler allocates a **variable token count** per request per forward pass (chunked prefill, speculative decode, etc.).
 
 ## What I misunderstood before reading source
 
-**Pending Phase 3 source reconciliation.** No vLLM version is pinned in `pyproject.toml` and no
-vLLM source checkout or runtime artifact exists in this repository. Do not turn the current design
-references into a source-level claim until the Phase 3 environment is installed and inspected.
+**The Phase 2 prefix cache is not a miniature Automatic Prefix Caching.** Treating a hit on the whole 23-token prefix as “like vLLM APC” overstates the mechanism: vLLM only caches **full blocks**, keys include the **parent block hash** (and extras such as LoRA / multimodal / cache salt), and reuse is mediated by the KV cache manager + scheduler admission — not a single dict of prefix digests. Document that boundary in any Phase 3–5 routing claims.
+
+## Runtime measurement status
+
+Source reconciliation above does **not** require a GPU. Measured `results/phase3/vllm_load.csv` / overlay chart remain **pending Colab/Kaggle T4** (AC-005).

@@ -1,8 +1,8 @@
 # Acceptance Brief: Phase 3 vLLM reconciliation
 
-**Status:** Draft → implementing  
-**Revision:** 1  
-**Approval required before risky work:** No for offline harness/plot/source-diff; Yes for inventing GPU numbers (forbidden)
+**Status:** Offline slice implemented; AC-005 pending Colab/Kaggle  
+**Revision:** 2  
+**Approval required before risky work:** No for offline harness/plot/source-diff; inventing GPU numbers forbidden
 
 ## Goal
 
@@ -34,9 +34,9 @@ Reconcile Phase 1 naive HF load against a pinned vLLM run on Colab/Kaggle T4, wi
 ### AC-001: vLLM version pinned and recorded
 - **Scenario:** Repo dependency metadata and reading list
 - **Action:** Inspect `pyproject.toml` + `docs/knowledge/vllm-internals/READING_LIST.md`
-- **Expected:** Exact version `0.26.0`; Colab T4 note names the `+cu129` wheel asset when CUDA 12.x drivers apply
-- **Must not:** Leave `vllm` unversioned
-- **Verification:** Manual doc/dep review
+- **Expected:** Exact version `0.26.0` in harness + config + READING_LIST; Colab T4 note names the `+cu129` wheel. (`pyproject.toml` `gpu` group stays empty — declaring `vllm==0.26.0` breaks laptop uv resolve vs cu124 torch index.)
+- **Must not:** Leave the pin undocumented or invent GPU CSVs
+- **Verification:** Manual doc/dep review + `PINNED_VLLM_VERSION == "0.26.0"` in tests
 - **Priority:** Required
 
 ### AC-002: Overlay plot joins Phase 1 + Phase 3 CSVs
@@ -82,8 +82,8 @@ Reconcile Phase 1 naive HF load against a pinned vLLM run on Colab/Kaggle T4, wi
 
 | Criterion | Evidence | Status |
 | --- | --- | --- |
-| AC-001 | pyproject + READING_LIST | Pending |
-| AC-002 | pytest overlay | Pending |
-| AC-003 | pytest vllm_load helpers | Pending |
-| AC-004 | 02_source_diff.md | Pending |
+| AC-001 | READING_LIST + PINNED_VLLM_VERSION + phase3.yaml (pyproject gpu empty — resolve conflict) | Done |
+| AC-002 | `uv run pytest fundamentals/experiments/test_plot_naive_vs_vllm.py` → 4 passed | Done |
+| AC-003 | `uv run pytest fundamentals/experiments/test_vllm_load.py` → 4 passed | Done |
+| AC-004 | 02_source_diff.md @ tag v0.26.0 | Done |
 | AC-005 | results/phase3/* after Colab | Pending (needs GPU) |

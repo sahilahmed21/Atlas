@@ -3,7 +3,7 @@ name = "atlas"
 version = "0.1.0"
 description = "Production-grade multi-tenant LLM serving behavior on constrained hardware"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     # Phase 1–2: naive HF load + fundamentals sims + charts
     "transformers>=4.40",
@@ -41,12 +41,11 @@ dependencies = [
 dev = [
     "pytest>=9.1.1",
 ]
-# Colab / Kaggle / WSL GPU runtimes (Phase 3+). Prefer matching the runtime CUDA docs.
-# vLLM has limited native Windows support — install this group on Linux/Colab/WSL.
-gpu = [
-    "vllm",
-    "bitsandbytes>=0.43",
-]
+# Phase 3+ GPU deps are NOT declared here: vllm==0.26.0 pulls torch==2.11.0 from
+# PyPI, which conflicts with this project's cu124 torch index on laptop resolve.
+# Pin is enforced in code (PINNED_VLLM_VERSION) + configs/models/phase3.yaml.
+# Install on Colab/Kaggle T4 via the +cu129 wheel — see READING_LIST.md.
+gpu = []
 
 [tool.uv]
 package = false

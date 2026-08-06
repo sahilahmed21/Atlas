@@ -1,14 +1,24 @@
 # vLLM internals — reading list
 
-| Area | Upstream path (approx) | Atlas note |
+**Pinned vLLM version:** `0.26.0` (GitHub release 2026-07-27).
+Harness constant: `fundamentals/experiments/vllm_load.py::PINNED_VLLM_VERSION`.
+Config: `configs/models/phase3.yaml` → `vllm_version: "0.26.0"`.
+
+## Install notes (verified)
+
+| Host | Install |
+| --- | --- |
+| Linux with CUDA 13 runtime | `pip install vllm==0.26.0` (or matching wheel). Not declared in `pyproject.toml` `gpu` group — that pin conflicts with this repo’s cu124 torch index on laptop resolve. |
+| Colab / Kaggle **T4** (typical CUDA **12.x** driver) | Install release asset `vllm-0.26.0+cu129-cp38-abi3-manylinux_2_28_x86_64.whl` from the [v0.26.0 release](https://github.com/vllm-project/vllm/releases/tag/v0.26.0). Default CUDA 13 wheels fail with missing `libcudart.so.13`. |
+| Native Windows | Not supported; use WSL2 / Colab / Kaggle |
+
+Smoke: `scripts/verify_wsl_vllm.py` (prints `vllm.__version__`).
+
+| Area | Upstream path (tag `v0.26.0`) | Atlas note |
 | --- | --- | --- |
-| Block manager | Current docs: [PagedAttention design](https://docs.vllm.ai/en/latest/design/paged_attention/); exact implementation path must come from the pinned checkout. | Compare Phase 2's block table and tail-waste model with real cache-block allocation, sharing, and preemption. |
-| Scheduler | Current docs: [vLLM overview](https://docs.vllm.ai/) describes continuous batching; exact implementation path must come from the pinned checkout. | Compare the toy's fixed service steps with real token budgets, admission, and scheduling policy. |
-| Prefix caching | Current docs: [Automatic Prefix Caching](https://docs.vllm.ai/en/latest/features/automatic_prefix_caching/). | Verify exact token/block hashing, cacheability, eviction, and the prefill-only performance boundary. |
-| OpenAI API server | Current docs: [OpenAI-compatible server](https://docs.vllm.ai/en/latest/serving/openai_compatible_server/). | Phase 4 should use the pinned server contract, not this planning note, for the worker client. |
+| KV / blocks + APC | `vllm/v1/core/kv_cache_manager.py`; design: `docs/design/prefix_caching.md` | Compare Phase 2 block table + whole-prefix hash vs **full-block** hash chains + LRU free queue |
+| Scheduler | `vllm/v1/core/sched/scheduler.py` (`schedule()` → `{req_id: num_tokens}`) | Compare toy one-token-per-tick vs token-budget / chunked prefill / preemption |
+| Prefix caching | Same KV manager + design doc (hash = parent + block tokens + extras; only full blocks) | Toy keys entire 23-token prefix once — **not** block-aligned APC |
+| OpenAI API server | docs: OpenAI-compatible server | Phase 4 worker client must use this pin |
 
-**Pinned vLLM version:** Not pinned. `pyproject.toml` declares unversioned `vllm` only in the
-Phase 3+ GPU group, and the repository has no vLLM source checkout.
-
-Log version, commit/tag, and file:line references when doing the Phase 3 source diff. Current
-documentation is design context only and is not evidence of an installed implementation.
+Log file:line references in `docs/phases/phase-3/02_source_diff.md` when reconciling.
