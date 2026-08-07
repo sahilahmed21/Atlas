@@ -51,5 +51,19 @@ gpu = []
 package = false
 default-groups = ["dev"]
 
+# package=false layout: each fundamentals/platform dir is importable by basename
+[tool.pytest.ini_options]
+pythonpath = [
+    "fundamentals/experiments",
+    "fundamentals/allocators",
+    "fundamentals/schedulers",
+    "fundamentals/prefix_cache",
+    "platform/gateway",
+    "platform/tenant",
+    "platform/registry",
+    "platform/router",
+    "workers",
+]
+
 [[tool.uv.index]]
 url = "https://download.pytorch.org/whl/cu124"

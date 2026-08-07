@@ -1,0 +1,8 @@
+# Phase 4 worker registry — point base_url at real vLLM OpenAI servers when available
+workers:
+  - id: worker-a
+    model: Qwen/Qwen2.5-0.5B-Instruct
+    base_url: http://127.0.0.1:8001/v1
+  - id: worker-b
+    model: Qwen/Qwen2.5-0.5B-Instruct
+    base_url: http://127.0.0.1:8002/v1

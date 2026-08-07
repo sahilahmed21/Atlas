@@ -1,2 +1,12 @@
-# Placeholder — Phase 4
-tenants: []
+# Phase 4 demo tenants — synthetic keys only
+tenants:
+  - id: demo
+    api_key: sk-atlas-demo-key
+    rpm_limit: 60
+    allowed_models:
+      - Qwen/Qwen2.5-0.5B-Instruct
+  - id: other
+    api_key: sk-atlas-other-key
+    rpm_limit: 30
+    allowed_models:
+      - Qwen/Qwen2.5-0.5B-Instruct

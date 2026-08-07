@@ -1,6 +1,7 @@
 # Phase 4 — Platform layer (router centerpiece)
 
-**Status:** Not started — blocked on Phase 3's real vLLM baseline
+**Status:** Scaffolding in progress — gateway/tenant/registry/router + fake-worker tests  
+**Acceptance:** [ACCEPTANCE.md](ACCEPTANCE.md) · **TDD:** [`docs/testing/phase-4.tdd.md`](../../testing/phase-4.tdd.md)  
 **Hardware:** Laptop for API; Colab for GPU-backed integration tests  
 **Scope boundary:** implement only the thin gateway, routing, and observability path needed for
 Phases 5 and 5.5. No multi-node, RDMA, or production autoscaler is implied by this phase.
