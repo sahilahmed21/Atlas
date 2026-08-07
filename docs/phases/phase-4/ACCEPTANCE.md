@@ -1,6 +1,6 @@
 # Acceptance Brief: Phase 4 platform end-to-end
 
-**Status:** Scaffold AC-001–007 PASS; remaining AC-008–013 implementing via TDD  
+**Status:** Implemented (E2E offline) — AC-001–013 evidenced with fake worker / httpx mocks  
 **Revision:** 2  
 **Approval required before risky work:** No — offline/fake-worker only; inventing live GPU metrics forbidden
 
@@ -102,7 +102,7 @@ Complete Phase 4 so the request path authenticates, rate-limits (honestly labele
 | Criterion | Evidence | Status |
 | --- | --- | --- |
 | AC-001–007 | scaffold suite | PASS |
-| AC-008 | tenant RPM + gateway RPM tests | Pending |
-| AC-009–010 | worker stream + gateway passthrough | Pending |
-| AC-011–012 | metrics + OTEL tests | Pending |
-| AC-013 | KEDA YAML + pin helper tests | Pending |
+| AC-008 | tenant RPM + gateway RPM tests | PASS |
+| AC-009–010 | worker stream + gateway passthrough | PASS |
+| AC-011–012 | metrics + OTEL tests | PASS |
+| AC-013 | KEDA YAML + pin helper tests | PASS |

@@ -1,4 +1,4 @@
-"""Routing strategies — round_robin / least_load / prefix_aware (scaffold)."""
+"""Routing strategies — round_robin / least_load / prefix_aware."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ class RouteDecision:
     worker_id: str
     strategy: str
     reason: str
+    cache_signal: str = "n/a"
 
 
 def prefix_hash(prompt: str) -> str:
@@ -36,6 +37,7 @@ class RoundRobinRouter:
             worker_id=w.id,
             strategy="round_robin",
             reason=f"round_robin index->{w.id}",
+            cache_signal="n/a",
         )
 
 
@@ -54,6 +56,7 @@ class LeastLoadRouter:
             worker_id=best.id,
             strategy="least_load",
             reason=f"least_load load={load} ->{best.id}",
+            cache_signal="n/a",
         )
 
 
@@ -75,13 +78,14 @@ class PrefixAwareRouter:
                 worker_id=owner,
                 strategy="prefix_aware",
                 reason=f"prefix hit hash={key} ->{owner}",
+                cache_signal="hit",
             )
-        # deterministic fallback: stable order by worker id
         fallback = sorted(workers, key=lambda w: w.id)[0]
         return RouteDecision(
             worker_id=fallback.id,
             strategy="prefix_aware",
             reason=f"prefix miss hash={key}; fallback ->{fallback.id}",
+            cache_signal="miss",
         )
 
 

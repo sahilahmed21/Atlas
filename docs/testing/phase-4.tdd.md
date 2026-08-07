@@ -1,55 +1,55 @@
-# TDD evidence — Phase 4 platform scaffolding
+# TDD evidence — Phase 4 platform end-to-end
 
 **Source plan:** [`docs/phases/phase-4/README.md`](../phases/phase-4/README.md)  
-**Acceptance:** [`docs/phases/phase-4/ACCEPTANCE.md`](../phases/phase-4/ACCEPTANCE.md)
+**Acceptance:** [`docs/phases/phase-4/ACCEPTANCE.md`](../phases/phase-4/ACCEPTANCE.md) (rev 2)
 
 ## User journeys
 
-1. As a client, I want `POST /v1/chat/completions` with an API key so I get an OpenAI-shaped completion from a routed worker.
-2. As a platform engineer, I want invalid/auth failures rejected at the gateway without calling a worker.
-3. As a routing engineer, I want round_robin / least_load / prefix_aware decisions with non-empty reasons for Phase 5.
-4. As a worker owner, I want a thin client that POSTs to `{base_url}/chat/completions` without tenant logic.
+1. As a tenant, I want RPM enforced with an honest `process-local` label so I am not misled about multi-replica safety.
+2. As a client, I want `stream=true` to pass through upstream SSE with measurable TTFT from the worker client.
+3. As a dashboard (Phase 5.5), I want `/metrics` populated by the same request path that served the completion.
+4. As an operator, I want a KEDA sketch keyed on `atlas_queue_depth` marked as planning-only, plus a pin helper for vLLM `0.26.0`.
 
 ## Task report
 
-### Task: RED reproducers (AC-001–007)
+### Task: RED (AC-008–013)
 
-- **Summary:** Added failing tests under `platform/*` and `workers/` before implementations existed.
-- **RED command:** `uv run pytest platform workers -q --tb=line`
-- **RED result:** `20 failed` — `ModuleNotFoundError` for `app` / `tenants` / `workers_registry` / `strategies` / `openai_worker_client` (intended missing-impl RED). One async-mark failure on worker client was converted to sync before GREEN.
-- **Guaranteed:** Tests compile and execute; failure mode is missing production modules.
+- **Command:** `uv run pytest platform/tenant/test_tenant_rpm.py platform/gateway/test_gateway_rpm.py platform/gateway/test_gateway_metrics.py platform/observability platform/autoscaling workers/test_openai_worker_client.py::test_stream_chat_completions_records_ttft_and_request_id -q --tb=line`
+- **Result:** `12 failed` — missing `rpm` / `atlas_metrics` / `otel_hooks` / `vllm_pin` / KEDA file / `stream_chat_completions`; gateway still re-wrapped non-stream for SSE; RPM not enforced
+- **Checkpoint:** `dcaa927` `test: Phase 4 remaining E2E reproducers (RED)`
 
-### Task: GREEN scaffold
+### Task: GREEN
 
-- **Summary:** Minimal YAML tenant/registry, three routers, OpenAI worker client, FastAPI gateway with fake-worker injection + scaffold SSE.
-- **GREEN command:** `uv run pytest platform workers -q`
-- **GREEN result:** `20 passed`
-- **Guaranteed:** Auth → route → fake worker path; route headers; prefix hit/fallback reasons; no GPU required.
+- **Command:** `uv run pytest platform workers -q`
+- **Result:** `32 passed`
+- **Guaranteed:** RPM 429 + scope header; upstream SSE passthrough; Prometheus from request path; OTEL span; KEDA sketch; vLLM pin helper; stream timings
+
+### Verification note
+
+Exa MCP was **not** configured in this environment. Contracts verified via web search: `generate_latest` for `/metrics` (avoid mount redirect), OpenAI/vLLM SSE `data:` + `[DONE]`, KEDA Prometheus trigger on queue depth.
 
 ## Test specification
 
-| # | What is guaranteed | Test | Result |
+| # | Guarantee | Test | Result |
 | --- | --- | --- | --- |
-| 1 | Valid chat returns completion + route headers | `test_gateway_chat.py::test_chat_completions_ok_with_route_decision` | PASS |
-| 2 | Missing messages → 400, no worker call | `test_chat_completions_rejects_missing_messages` | PASS |
-| 3 | Missing model → 400 | `test_chat_completions_rejects_missing_model` | PASS |
-| 4 | Bad key → 401; secrets not echoed | `test_chat_completions_unauthorized` | PASS |
-| 5 | Disallowed model → 403 | `test_chat_completions_rejects_disallowed_model` | PASS |
-| 6 | `stream=true` yields SSE + `[DONE]` | `test_streaming_returns_sse_chunks` | PASS |
-| 7–10 | Tenant YAML load + authenticate | `test_tenant_auth.py` | PASS |
-| 11–13 | Worker registry resolve-by-model | `test_worker_registry.py` | PASS |
-| 14–18 | RR / least-load / prefix hit+fallback / empty | `test_router_strategies.py` | PASS |
-| 19–20 | Worker client POST path + HTTP error | `test_openai_worker_client.py` | PASS |
+| 1–3 | Process-local RPM window + honesty constant | `test_tenant_rpm.py` | PASS |
+| 4 | 3rd request → 429 + `x-atlas-rpm-scope` | `test_gateway_rpm.py` | PASS |
+| 5–6 | Metrics labels + queue gauge | `test_atlas_metrics.py` | PASS |
+| 7 | OTEL `atlas.chat_completions` span | `test_otel_hooks.py` | PASS |
+| 8–9 | `/metrics` after request; SSE passthrough | `test_gateway_metrics.py` | PASS |
+| 10–11 | KEDA sketch + pin `0.26.0` | `test_keda_sketch.py` | PASS |
+| 12 | Stream TTFT / request_id timings | `test_openai_worker_client.py` | PASS |
+| 13–32 | Prior scaffold AC-001–007 suite | gateway/tenant/registry/router/worker | PASS |
 
-Evidence command: `uv run pytest platform workers -q` → `20 passed`.
+Evidence: `uv run pytest platform workers -q` → `32 passed`.
 
 ## Coverage and known gaps
 
-No coverage tool run. Intentionally deferred: real vLLM wiring, process-local RPM enforcement, Prometheus/OTEL, least-load live queue depth from workers, true token streaming from upstream, distributed prefix index.
+No coverage % tool. Still deferred: live Colab vLLM behind gateway, distributed RPM, true multi-replica queue depth, applying KEDA to a cluster.
 
 ## Merge evidence / checkpoints
 
-| Stage | Evidence |
+| Commit | Stage |
 | --- | --- |
-| RED | `20 failed` ModuleNotFoundError before impl (session log) |
-| GREEN | `20 passed` after scaffold |
+| `dcaa927` test: Phase 4 remaining E2E reproducers (RED) | RED |
+| (this session) feat: Phase 4 RPM/metrics/stream/KEDA (GREEN) | GREEN |

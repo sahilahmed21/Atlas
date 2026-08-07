@@ -1,0 +1,20 @@
+# Phase 4 autoscaling sketch — PLANNING ONLY. Not applied to any cluster.
+# Trigger uses the gateway process-local atlas_queue_depth gauge from /metrics.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: atlas-worker-queue-depth
+  annotations:
+    atlas.phase: "4"
+    atlas.note: "planning sketch — do not treat as a live run"
+spec:
+  scaleTargetRef:
+    name: atlas-vllm-worker
+  minReplicaCount: 1
+  maxReplicaCount: 2
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus:9090
+        query: sum(atlas_queue_depth)
+        threshold: "4"

@@ -6,7 +6,7 @@
 | 1 | [phase-1/START_HERE.md](phase-1/START_HERE.md) | Done — AC-001–AC-004 evidenced |
 | 2 | [phase-2](phase-2/) | Done — toys + `results/phase2/` |
 | 3 | [phase-3](phase-3/) | **Done** — Colab T4 CSV + overlay |
-| 4 | [phase-4](phase-4/) | Scaffold — gateway/router tests green; real vLLM wiring next |
+| 4 | [phase-4](phase-4/) | **Done** (offline) — gateway/router/metrics; live vLLM optional |
 | 5 | [phase-5](phase-5/) | Blocked |
 | 5.5 | [phase-5.5](phase-5.5/) | Blocked |
 | 6 | [phase-6](phase-6/) | Blocked |
