@@ -59,25 +59,27 @@ class OpenAIWorkerClient:
         ttft_ms: float | None = None
         request_id: str | None = None
         status = "ok"
+        stream_cm = None
         try:
-            with self.http.stream("POST", "/chat/completions", json=body) as res:
-                res.raise_for_status()
-                for line in res.iter_lines():
-                    if not line:
-                        continue
-                    if (
-                        ttft_ms is None
-                        and line.startswith("data:")
-                        and "[DONE]" not in line
-                    ):
-                        ttft_ms = (time.perf_counter() - t0) * 1000
-                        raw = line[5:].strip()
-                        try:
-                            chunk = json.loads(raw)
-                            request_id = chunk.get("id") or request_id
-                        except json.JSONDecodeError:
-                            pass
-                    yield f"{line}\n\n"
+            stream_cm = self.http.stream("POST", "/chat/completions", json=body)
+            res = stream_cm.__enter__()
+            res.raise_for_status()
+            for line in res.iter_lines():
+                if not line:
+                    continue
+                if (
+                    ttft_ms is None
+                    and line.startswith("data:")
+                    and "[DONE]" not in line
+                ):
+                    ttft_ms = (time.perf_counter() - t0) * 1000
+                    raw = line[5:].strip()
+                    try:
+                        chunk = json.loads(raw)
+                        request_id = chunk.get("id") or request_id
+                    except json.JSONDecodeError:
+                        pass
+                yield f"{line}\n\n"
         except Exception:
             status = "error"
             self.last_timings = {
@@ -88,13 +90,17 @@ class OpenAIWorkerClient:
                 "tokens_per_s": None,
             }
             raise
-        self.last_timings = {
-            "request_id": request_id,
-            "ttft_ms": ttft_ms,
-            "completion_ms": (time.perf_counter() - t0) * 1000,
-            "status": status,
-            "tokens_per_s": None,
-        }
+        finally:
+            if stream_cm is not None:
+                stream_cm.__exit__(None, None, None)
+            if status == "ok":
+                self.last_timings = {
+                    "request_id": request_id,
+                    "ttft_ms": ttft_ms,
+                    "completion_ms": (time.perf_counter() - t0) * 1000,
+                    "status": status,
+                    "tokens_per_s": None,
+                }
 
     def close(self) -> None:
         if self._owns_http:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import threading
 from dataclasses import dataclass
 from typing import Any, Sequence
 
@@ -28,11 +29,13 @@ def _require_workers(workers: Sequence[Any]) -> None:
 class RoundRobinRouter:
     def __init__(self) -> None:
         self._i = 0
+        self._lock = threading.Lock()
 
     def choose(self, workers: Sequence[Any], **_: Any) -> RouteDecision:
         _require_workers(workers)
-        w = workers[self._i % len(workers)]
-        self._i += 1
+        with self._lock:
+            w = workers[self._i % len(workers)]
+            self._i += 1
         return RouteDecision(
             worker_id=w.id,
             strategy="round_robin",

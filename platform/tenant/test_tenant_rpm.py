@@ -1,17 +1,13 @@
 """RED/GREEN: process-local RPM limiter (AC-008)."""
 
-import time
-
 
 def test_process_local_rpm_allows_under_limit():
     from rpm import ProcessLocalRPMLimiter
 
     lim = ProcessLocalRPMLimiter(clock=lambda: 1000.0)
-    assert lim.check("demo", limit=2) is True
-    lim.record("demo")
-    assert lim.check("demo", limit=2) is True
-    lim.record("demo")
-    assert lim.check("demo", limit=2) is False
+    assert lim.try_acquire("demo", limit=2) is True
+    assert lim.try_acquire("demo", limit=2) is True
+    assert lim.try_acquire("demo", limit=2) is False
 
 
 def test_process_local_rpm_window_expires():
@@ -23,11 +19,11 @@ def test_process_local_rpm_window_expires():
         return t["now"]
 
     lim = ProcessLocalRPMLimiter(window_s=60.0, clock=clock)
-    lim.record("demo")
-    lim.record("demo")
-    assert lim.check("demo", limit=2) is False
+    assert lim.try_acquire("demo", limit=2) is True
+    assert lim.try_acquire("demo", limit=2) is True
+    assert lim.try_acquire("demo", limit=2) is False
     t["now"] = 61.0
-    assert lim.check("demo", limit=2) is True
+    assert lim.try_acquire("demo", limit=2) is True
 
 
 def test_rpm_scope_constant_is_honest():

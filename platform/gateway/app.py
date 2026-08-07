@@ -2,22 +2,31 @@
 
 from __future__ import annotations
 
+import asyncio
+import inspect
+import threading
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, AsyncIterator, Callable
 
-from fastapi import FastAPI, Header
+import httpx
+from fastapi import FastAPI, Header, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response, StreamingResponse
+from opentelemetry import trace
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel
 
 from atlas_metrics import AtlasMetrics
 from openai_worker_client import OpenAIWorkerClient
-from otel_hooks import start_chat_span
+from otel_hooks import begin_chat_span
 from rpm import RPM_SCOPE, ProcessLocalRPMLimiter
 from strategies import LeastLoadRouter, build_router
 from tenants import authenticate, load_tenants
 from workers_registry import load_workers, resolve_workers
+
+_SENTINEL = object()
 
 
 class ChatMessage(BaseModel):
@@ -60,6 +69,31 @@ def _prompt_text(messages: list[ChatMessage]) -> str:
     return "\n".join(f"{m.role}: {m.content}" for m in messages)
 
 
+async def _call_chat(client: Any, payload: dict[str, Any]) -> dict[str, Any]:
+    fn = client.chat_completions
+    if inspect.iscoroutinefunction(fn):
+        return await fn(payload)
+    return await asyncio.to_thread(fn, payload)
+
+
+async def _aiter_sse(client: Any, payload: dict[str, Any]) -> AsyncIterator[str]:
+    gen = client.stream_chat_completions(payload)
+    if inspect.isasyncgen(gen) or hasattr(gen, "__aiter__"):
+        async for line in gen:
+            yield line
+        return
+    it = iter(gen)
+
+    def _next():
+        return next(it, _SENTINEL)
+
+    while True:
+        line = await asyncio.to_thread(_next)
+        if line is _SENTINEL:
+            break
+        yield line  # type: ignore[misc]
+
+
 def create_app(
     *,
     tenants_path: str | Path,
@@ -78,8 +112,28 @@ def create_app(
     )
     metrics = metrics or AtlasMetrics()
     rpm = ProcessLocalRPMLimiter()
+    client_cache: dict[str, Any] = {}
+    cache_lock = threading.Lock()
 
-    app = FastAPI(title="Atlas gateway", version="0.1.0")
+    def get_client(base_url: str) -> Any:
+        with cache_lock:
+            if base_url not in client_cache:
+                client_cache[base_url] = factory(base_url)
+            return client_cache[base_url]
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        yield
+        with cache_lock:
+            for c in client_cache.values():
+                close = getattr(c, "close", None)
+                if close is None:
+                    continue
+                result = close()
+                if inspect.isawaitable(result):
+                    await result
+
+    app = FastAPI(title="Atlas gateway", version="0.1.0", lifespan=lifespan)
     app.state.tenants = tenants
     app.state.workers = workers
     app.state.router_impl = router
@@ -88,8 +142,14 @@ def create_app(
     app.state.prefix_owners = prefix_owners or {}
     app.state.metrics = metrics
 
+    @app.exception_handler(RequestValidationError)
+    async def validation_error_handler(request: Request, exc: RequestValidationError):
+        return _error(400, "Invalid request body", "invalid_request_error")
+
     @app.get("/metrics")
-    def prometheus_metrics():
+    def prometheus_metrics(authorization: str | None = Header(default=None)):
+        if authenticate(tenants, _bearer(authorization)) is None:
+            return _error(401, "Invalid API key", "authentication_error")
         return Response(
             content=generate_latest(metrics.registry),
             media_type=CONTENT_TYPE_LATEST,
@@ -104,9 +164,6 @@ def create_app(
         if tenant is None:
             return _error(401, "Invalid API key", "authentication_error")
 
-        if not rpm.check(tenant.id, tenant.rpm_limit):
-            return _error(429, "Rate limit exceeded", "rate_limit_error")
-
         if not body.model:
             return _error(400, "Missing required parameter: model")
         if not body.messages:
@@ -119,101 +176,126 @@ def create_app(
         if not eligible:
             return _error(404, f"No workers for model {body.model}", "not_found_error")
 
-        rpm.record(tenant.id)
-        metrics.queue_inc()
+        if not rpm.try_acquire(tenant.id, tenant.rpm_limit):
+            return _error(429, "Rate limit exceeded", "rate_limit_error")
+
         t0 = time.perf_counter()
         decision = None
         worker = None
-        stream_owns_queue = False
+        span = begin_chat_span(tenant_id=tenant.id, strategy=strategy)
+        span_ctx = trace.use_span(span, end_on_exit=False)
+        span_ctx.__enter__()
+        stream_owns_cleanup = False
 
         try:
-            with start_chat_span(tenant_id=tenant.id, strategy=strategy) as span:
-                prompt = _prompt_text(body.messages)
-                choose_kwargs: dict[str, Any] = {}
-                if isinstance(router, LeastLoadRouter):
-                    choose_kwargs["loads"] = app.state.loads
-                if strategy == "prefix_aware":
-                    choose_kwargs["prompt"] = prompt
-                    choose_kwargs["prefix_owners"] = app.state.prefix_owners
+            prompt = _prompt_text(body.messages)
+            choose_kwargs: dict[str, Any] = {}
+            if isinstance(router, LeastLoadRouter):
+                choose_kwargs["loads"] = app.state.loads
+            if strategy == "prefix_aware":
+                choose_kwargs["prompt"] = prompt
+                choose_kwargs["prefix_owners"] = app.state.prefix_owners
 
-                decision = router.choose(eligible, **choose_kwargs)
-                worker = next(w for w in eligible if w.id == decision.worker_id)
-                span.set_attribute("atlas.worker_id", worker.id)
-                span.set_attribute("atlas.cache_signal", decision.cache_signal)
+            decision = router.choose(eligible, **choose_kwargs)
+            worker = next(w for w in eligible if w.id == decision.worker_id)
+            span.set_attribute("atlas.worker_id", worker.id)
+            span.set_attribute("atlas.cache_signal", decision.cache_signal)
 
-                client = factory(worker.base_url)
-                route_headers = {
-                    "x-atlas-worker-id": decision.worker_id,
-                    "x-atlas-route-strategy": decision.strategy,
-                    "x-atlas-route-reason": decision.reason,
-                    "x-atlas-tenant-id": tenant.id,
-                    "x-atlas-rpm-scope": RPM_SCOPE,
-                    "x-atlas-cache-signal": decision.cache_signal,
-                }
+            client = get_client(worker.base_url)
+            route_headers = {
+                "x-atlas-worker-id": decision.worker_id,
+                "x-atlas-route-strategy": decision.strategy,
+                "x-atlas-route-reason": decision.reason,
+                "x-atlas-tenant-id": tenant.id,
+                "x-atlas-rpm-scope": RPM_SCOPE,
+                "x-atlas-cache-signal": decision.cache_signal,
+            }
 
-                if body.stream:
-                    payload = {
-                        "model": body.model,
-                        "messages": [m.model_dump() for m in body.messages],
-                        "stream": True,
-                    }
-                    upstream = client.stream_chat_completions(payload)
-                    stream_owns_queue = True
-
-                    def event_stream():
-                        outcome = "error"
-                        timings: dict[str, Any] = {}
-                        try:
-                            for line in upstream:
-                                yield line
-                            timings = getattr(client, "last_timings", {}) or {}
-                            outcome = timings.get("status", "ok")
-                        except Exception:
-                            timings = getattr(client, "last_timings", {}) or {}
-                            outcome = "error"
-                            raise
-                        finally:
-                            metrics.observe_request(
-                                tenant_id=tenant.id,
-                                strategy=decision.strategy,
-                                worker_id=decision.worker_id,
-                                outcome=outcome,
-                                cache_signal=decision.cache_signal,
-                                ttft_ms=timings.get("ttft_ms"),
-                                completion_ms=timings.get("completion_ms"),
-                                tokens_per_s=timings.get("tokens_per_s"),
-                            )
-                            metrics.queue_dec()
-
-                    return StreamingResponse(
-                        event_stream(),
-                        media_type="text/event-stream",
-                        headers=route_headers,
-                    )
-
+            if body.stream:
                 payload = {
                     "model": body.model,
                     "messages": [m.model_dump() for m in body.messages],
-                    "stream": False,
+                    "stream": True,
                 }
-                upstream = client.chat_completions(payload)
-                timings = getattr(client, "last_timings", {}) or {}
-                if timings.get("completion_ms") is None:
-                    timings["completion_ms"] = (time.perf_counter() - t0) * 1000
-                outcome = timings.get("status", "ok")
+                stream_owns_cleanup = True
+
+                async def event_stream():
+                    outcome = "error"
+                    timings: dict[str, Any] = {}
+                    metrics.queue_inc()
+                    try:
+                        async for line in _aiter_sse(client, payload):
+                            yield line
+                        timings = getattr(client, "last_timings", {}) or {}
+                        outcome = timings.get("status", "ok")
+                    except Exception:
+                        timings = getattr(client, "last_timings", {}) or {}
+                        outcome = "error"
+                        raise
+                    finally:
+                        metrics.observe_request(
+                            tenant_id=tenant.id,
+                            strategy=decision.strategy,
+                            worker_id=decision.worker_id,
+                            outcome=outcome,
+                            cache_signal=decision.cache_signal,
+                            ttft_ms=timings.get("ttft_ms"),
+                            completion_ms=timings.get("completion_ms"),
+                            tokens_per_s=timings.get("tokens_per_s"),
+                        )
+                        metrics.queue_dec()
+                        span.end()
+                        span_ctx.__exit__(None, None, None)
+
+                return StreamingResponse(
+                    event_stream(),
+                    media_type="text/event-stream",
+                    headers=route_headers,
+                )
+
+            metrics.queue_inc()
+            payload = {
+                "model": body.model,
+                "messages": [m.model_dump() for m in body.messages],
+                "stream": False,
+            }
+            try:
+                upstream = await _call_chat(client, payload)
+            except httpx.HTTPError as exc:
                 metrics.observe_request(
                     tenant_id=tenant.id,
                     strategy=decision.strategy,
                     worker_id=decision.worker_id,
-                    outcome=outcome,
+                    outcome="error",
                     cache_signal=decision.cache_signal,
-                    ttft_ms=timings.get("ttft_ms"),
-                    completion_ms=timings.get("completion_ms"),
-                    tokens_per_s=timings.get("tokens_per_s"),
+                    completion_ms=(time.perf_counter() - t0) * 1000,
                 )
-                return JSONResponse(content=upstream, headers=route_headers)
+                msg = "Worker request failed"
+                if isinstance(exc, httpx.HTTPStatusError):
+                    msg = f"Worker error: {exc.response.status_code}"
+                return _error(502, msg, "upstream_error", extra_headers=route_headers)
+
+            timings = getattr(client, "last_timings", {}) or {}
+            if timings.get("completion_ms") is None:
+                timings["completion_ms"] = (time.perf_counter() - t0) * 1000
+            outcome = timings.get("status", "ok")
+            metrics.observe_request(
+                tenant_id=tenant.id,
+                strategy=decision.strategy,
+                worker_id=decision.worker_id,
+                outcome=outcome,
+                cache_signal=decision.cache_signal,
+                ttft_ms=timings.get("ttft_ms"),
+                completion_ms=timings.get("completion_ms"),
+                tokens_per_s=timings.get("tokens_per_s"),
+            )
+            return JSONResponse(content=upstream, headers=route_headers)
         except Exception:
-            if decision is not None and worker is not None and not stream_owns_queue:
+            if (
+                decision is not None
+                and worker is not None
+                and not stream_owns_cleanup
+            ):
                 metrics.observe_request(
                     tenant_id=tenant.id,
                     strategy=decision.strategy,
@@ -224,8 +306,10 @@ def create_app(
                 )
             raise
         finally:
-            if not stream_owns_queue:
+            if not stream_owns_cleanup:
                 metrics.queue_dec()
+                span.end()
+                span_ctx.__exit__(None, None, None)
 
     @app.get("/healthz")
     async def healthz():

@@ -86,7 +86,10 @@ def test_metrics_endpoint_after_request(tmp_path: Path):
     )
     assert res.status_code == 200
 
-    metrics_res = client.get("/metrics")
+    metrics_res = client.get(
+        "/metrics",
+        headers={"Authorization": "Bearer sk-atlas-demo-key"},
+    )
     assert metrics_res.status_code == 200
     body = metrics_res.text
     assert "atlas_requests_total" in body
