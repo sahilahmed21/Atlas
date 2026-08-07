@@ -1,100 +1,108 @@
-# Acceptance Brief: Phase 4 scaffolding (gateway + router)
+# Acceptance Brief: Phase 4 platform end-to-end
 
-**Status:** Implemented (scaffold) — AC-001–007 evidenced offline with fake worker  
-**Revision:** 1  
-**Approval required before risky work:** No — laptop/fake-worker only; inventing live metrics forbidden
+**Status:** Scaffold AC-001–007 PASS; remaining AC-008–013 implementing via TDD  
+**Revision:** 2  
+**Approval required before risky work:** No — offline/fake-worker only; inventing live GPU metrics forbidden
+
+## Revision Log
+
+| Rev | Date | Changed criteria | Reason |
+| --- | --- | --- | --- |
+| 1 | 2026-08-07 | AC-001–007 | Scaffold |
+| 2 | 2026-08-08 | AC-008–013 | Remaining Phase 4 E2E |
 
 ## Goal
 
-A local client can authenticate, route, and complete one OpenAI-compatible chat request through the gateway to an explicitly labeled fake worker, with inspectable route decisions.
+Complete Phase 4 so the request path authenticates, rate-limits (honestly labeled), routes, talks to an OpenAI-compatible worker (stream timings preserved), and exports Prometheus metrics from that same path — with a KEDA sketch only as planning material.
 
 ## Scope
 
 **In scope**
-- FastAPI `POST /v1/chat/completions` (non-stream + stream) with documented 4xx error shape
-- YAML tenants (API key → tenant id; allowed models)
-- YAML worker registry (model → workers)
-- Router strategies: round_robin, least_load, prefix_aware — each emits `worker_id`, `strategy`, `reason`
-- Thin worker client POSTing to a worker's OpenAI-compatible `/v1/chat/completions`
-- Fake-worker integration test (no GPU)
+- Process-local RPM limiter labeled as not production-safe; HTTP 429 when exceeded
+- Worker client streaming SSE + `ttft_ms` / `completion_ms` / `request_id` / outcome
+- Gateway passthrough of upstream SSE when `stream=true`
+- Prometheus metrics on the request path + `GET /metrics` (no synthetic dashboard events)
+- Thin OTEL span hook around chat completions
+- Queue-depth gauge + KEDA ScaledObject YAML sketch under `deploy/`
+- Pin helper matching Phase 3 `0.26.0` when a worker reports a version
 
 **Out of scope**
-- Real vLLM process / Colab GPU wiring
-- Prometheus / OTEL / dashboard metrics (hooks later)
-- Production-safe distributed RPM limiter (process-local only if present; must be labeled)
-- Autoscaling / KEDA / multi-node
-- Invented cache-hit or TTFT dashboard numbers
+- Live Colab/GPU vLLM process in CI
+- Distributed/shared RPM store
+- Claiming KEDA was run in a cluster
+- Invented TTFT/cache numbers not produced by the request path
 
-## Assumptions
+## Context
 
-- API key via `Authorization: Bearer <key>`
-- Workers are OpenAI-compatible HTTP servers; tests inject a fake client
-- Prefix-aware uses an injected local `prefix_hash → worker_id` map (no distributed cache index)
-- Test runner: `uv run pytest platform workers -q`
+**Discovered facts**
+- Scaffold AC-001–007 green (`20 passed`)
+- `prometheus-client` already in `pyproject.toml`; prefer `generate_latest` over `mount("/metrics")` to avoid trailing-slash redirect
+- vLLM OpenAI stream = SSE `data: {json}` … `data: [DONE]`
+- Exa MCP not configured in this environment; verified via web search instead
+
+**Assumptions**
+- Fake worker / httpx MockTransport is sufficient evidence for AC-008–013
+- Process-local RPM + queue depth are acceptable if labeled
 
 ## Acceptance Criteria
 
-### AC-001: Valid chat completion through gateway + fake worker
-- **Scenario:** known API key, allowed model, fake worker injected
-- **Action:** `POST /v1/chat/completions` with messages
-- **Expected:** HTTP 200; body has `object=chat.completion`, `choices[0].message.content`, and response header or body field exposing route decision reason
-- **Must not:** call a real GPU worker
-- **Verification:** `uv run pytest platform/gateway/test_gateway_chat.py`
+### AC-008: Process-local RPM with honesty label
+- **Scenario:** tenant `rpm_limit: 2`; three rapid authenticated requests
+- **Action:** POST chat completions
+- **Expected:** first two succeed (or reach worker); third returns 429; response includes `x-atlas-rpm-scope: process-local`
+- **Must not:** claim distributed/production-safe limiting
+- **Verification:** `uv run pytest platform/tenant/test_tenant_rpm.py platform/gateway/test_gateway_rpm.py`
 - **Priority:** Required
 
-### AC-002: Invalid request rejected at boundary
-- **Scenario:** authenticated request missing `messages` or `model`
-- **Action:** `POST /v1/chat/completions`
-- **Expected:** HTTP 400 with OpenAI-ish `error.message` / `error.type`
-- **Must not:** forward to worker
-- **Verification:** same gateway tests
-- **Priority:** Required
-
-### AC-003: API key auth
-- **Scenario:** YAML tenant registry with one key
-- **Action:** authenticate with valid vs unknown key
-- **Expected:** valid → tenant id; unknown → HTTP 401 from gateway
-- **Must not:** log the raw API key in returned errors
-- **Verification:** tenant + gateway tests
-- **Priority:** Required
-
-### AC-004: Registry resolves workers by model
-- **Scenario:** two workers sharing a model id in YAML
-- **Action:** resolve by model
-- **Expected:** both workers returned; unknown model → empty list
-- **Verification:** `uv run pytest platform/registry/test_worker_registry.py`
-- **Priority:** Required
-
-### AC-005: Round-robin + least-load emit reasons
-- **Scenario:** ≥2 eligible workers
-- **Action:** choose repeatedly / with uneven loads
-- **Expected:** RR cycles; least-load picks lowest load; each decision has non-empty `reason`
-- **Verification:** `uv run pytest platform/router/test_router_strategies.py`
-- **Priority:** Required
-
-### AC-006: Prefix-aware hit and deterministic fallback
-- **Scenario:** known prefix hash owned by worker-b; unknown prefix
-- **Action:** choose with prompt
-- **Expected:** hit → worker-b + reason mentions prefix; miss → deterministic fallback + reason mentions fallback
-- **Verification:** same router tests
-- **Priority:** Required
-
-### AC-007: Worker client posts OpenAI chat path
-- **Scenario:** httpx mock / ASGI transport
-- **Action:** `chat_completions(payload)`
-- **Expected:** `POST {base_url}/chat/completions` (base_url already includes `/v1`); returns JSON body
+### AC-009: Worker client stream timings
+- **Scenario:** MockTransport returns two SSE content chunks then `[DONE]` with `id` in JSON
+- **Action:** `stream_chat_completions`
+- **Expected:** yields SSE lines; `ttft_ms` set after first `data:` JSON; `completion_ms` after `[DONE]`; `request_id` from chunk id; `status=ok`
+- **Must not:** require a live GPU
 - **Verification:** `uv run pytest workers/test_openai_worker_client.py`
+- **Priority:** Required
+
+### AC-010: Gateway upstream SSE passthrough
+- **Scenario:** fake/stream-capable worker injected; `stream=true`
+- **Action:** POST chat completions
+- **Expected:** response body contains upstream chunk text and `[DONE]`; worker was invoked with `stream=True`
+- **Must not:** only re-wrap a non-stream upstream call when client asked for stream
+- **Verification:** gateway stream tests
+- **Priority:** Required
+
+### AC-011: Request-path Prometheus metrics + `/metrics`
+- **Scenario:** one successful routed completion through gateway
+- **Action:** GET `/metrics`
+- **Expected:** text exposition includes counters/labels for tenant, strategy, worker_id, outcome; gauge `atlas_queue_depth`; cache signal; observed ttft/completion when provided
+- **Must not:** increment metrics from a dashboard-only code path
+- **Verification:** `uv run pytest platform/observability/test_atlas_metrics.py platform/gateway/test_gateway_metrics.py`
+- **Priority:** Required
+
+### AC-012: OTEL request span hook
+- **Scenario:** chat completion runs with default TracerProvider
+- **Action:** complete one request
+- **Expected:** at least one finished span named `atlas.chat_completions` (or child) recorded in an in-memory exporter
+- **Verification:** observability OTEL test
+- **Priority:** Important
+
+### AC-013: KEDA sketch + pin helper
+- **Scenario:** repo files present
+- **Action:** read `deploy/keda/atlas-queue-depth.yaml`; call pin helper
+- **Expected:** ScaledObject triggers on Prometheus query of `atlas_queue_depth`; pin helper accepts `0.26.0` and rejects others
+- **Must not:** imply the ScaledObject was applied to a live cluster
+- **Verification:** file + unit tests
 - **Priority:** Required
 
 ## Blocking Decisions
 
-- None for scaffolding. Streaming shape may be minimal SSE chunks labeled as scaffold.
+- None. Live GPU worker remains optional follow-up (Colab), not required to close Phase 4 offline.
 
 ## Verification Plan
 
 | Criterion | Evidence | Status |
 | --- | --- | --- |
-| AC-001–003 | `platform/gateway/test_gateway_chat.py` + tenant tests | PASS |
-| AC-004 | `platform/registry/test_worker_registry.py` | PASS |
-| AC-005–006 | `platform/router/test_router_strategies.py` | PASS |
-| AC-007 | `workers/test_openai_worker_client.py` | PASS |
+| AC-001–007 | scaffold suite | PASS |
+| AC-008 | tenant RPM + gateway RPM tests | Pending |
+| AC-009–010 | worker stream + gateway passthrough | Pending |
+| AC-011–012 | metrics + OTEL tests | Pending |
+| AC-013 | KEDA YAML + pin helper tests | Pending |

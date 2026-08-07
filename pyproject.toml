@@ -62,6 +62,8 @@ pythonpath = [
     "platform/tenant",
     "platform/registry",
     "platform/router",
+    "platform/observability",
+    "platform/autoscaling",
     "workers",
 ]
 

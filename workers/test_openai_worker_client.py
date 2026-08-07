@@ -1,4 +1,7 @@
-"""RED/GREEN: thin OpenAI-compatible worker client (AC-007)."""
+"""RED/GREEN: thin OpenAI-compatible worker client (AC-007, AC-009)."""
+
+import json
+import time
 
 import httpx
 import pytest
@@ -59,3 +62,48 @@ def test_chat_completions_raises_on_http_error():
         client.chat_completions(
             {"model": "m", "messages": [{"role": "user", "content": "x"}]}
         )
+
+
+def test_stream_chat_completions_records_ttft_and_request_id():
+    from openai_worker_client import OpenAIWorkerClient
+
+    chunks = [
+        b'data: {"id":"chatcmpl-stream","choices":[{"delta":{"content":"a"}}]}\n\n',
+        b'data: {"id":"chatcmpl-stream","choices":[{"delta":{"content":"b"},"finish_reason":"stop"}]}\n\n',
+        b"data: [DONE]\n\n",
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content)["stream"] is True
+        return httpx.Response(
+            200,
+            content=b"".join(chunks),
+            headers={"content-type": "text/event-stream"},
+        )
+
+    http = httpx.Client(
+        transport=httpx.MockTransport(handler),
+        base_url="http://worker.test/v1",
+    )
+    client = OpenAIWorkerClient(base_url="http://worker.test/v1", http=http)
+
+    t0 = time.perf_counter()
+    lines = list(
+        client.stream_chat_completions(
+            {
+                "model": "m",
+                "messages": [{"role": "user", "content": "x"}],
+                "stream": True,
+            }
+        )
+    )
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+
+    assert any("chatcmpl-stream" in line for line in lines)
+    assert any("[DONE]" in line for line in lines)
+    timings = client.last_timings
+    assert timings["status"] == "ok"
+    assert timings["request_id"] == "chatcmpl-stream"
+    assert timings["ttft_ms"] is not None
+    assert timings["ttft_ms"] <= timings["completion_ms"]
+    assert timings["completion_ms"] <= elapsed_ms + 50
