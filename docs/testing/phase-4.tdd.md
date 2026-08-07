@@ -52,4 +52,4 @@ No coverage % tool. Still deferred: live Colab vLLM behind gateway, distributed 
 | Commit | Stage |
 | --- | --- |
 | `dcaa927` test: Phase 4 remaining E2E reproducers (RED) | RED |
-| (this session) feat: Phase 4 RPM/metrics/stream/KEDA (GREEN) | GREEN |
+| `328e512` feat: Phase 4 RPM, metrics, stream passthrough, KEDA sketch (GREEN) | GREEN |
