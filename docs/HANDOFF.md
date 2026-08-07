@@ -3,7 +3,7 @@
 **Date:** 2026-08-07 (this session) · prior arc late July–early August 2026  
 **Branch:** `master` (local **ahead of origin by 11 commits** — not pushed)  
 **HEAD:** `9fcd902` — `fix: Phase 3 batch generate, NVML VRAM, hardware honesty (GREEN)`  
-**Next step:** **Phase 3 AC-005** — run harness on Colab/Kaggle T4; produce real `results/phase3/` artifacts  
+**Next step:** **Phase 4** — platform gateway + router (blocked until now; Phase 3 eye-stopper exists)  
 **Repo:** `C:/projects/Atlas`
 
 Paste this file (or `@docs/HANDOFF.md`) into a new chat to resume without rediscovery.
@@ -29,8 +29,8 @@ Framing: `docs/framing/ONE_SENTENCE.md` · Root: `README.md`
 | 0 Setup + framing | **Done** | Framing locked |
 | 1 Memory math + naive HF | **Done** | `results/phase1/oom_latency_curve.png` + CSV |
 | 2 Toy allocator / scheduler / prefix cache | **Done** | `results/phase2/*.csv` + sims under `fundamentals/` |
-| 3 vLLM reconciliation | **Offline done; GPU pending** | Need measured `results/phase3/vllm_load.csv` + `naive_vs_vllm.png` |
-| 4 Platform + router | Blocked on 3 AC-005 | `platform/` is README-only |
+| 3 vLLM reconciliation | **Done** | `results/phase3/naive_vs_vllm.png` + CSV (Colab T4) |
+| 4 Platform + router | **Do next** | `platform/` is README-only |
 | 5 Routing experiment | Blocked | Find where prefix-aware **loses** |
 | 5.5 Live dashboard | Blocked | Real metrics only |
 | 6 Write-up + pitch | Blocked | Honest constraint → future work |

@@ -1,0 +1,5 @@
+timestamp,hardware,model,n_concurrent,prompt_tokens,max_new_tokens,ttft_ms,total_ms,tokens_per_s,peak_vram_mb,status,notes
+2026-08-06T20:54:06Z,colab-t4,Qwen/Qwen2.5-0.5B-Instruct,1,23,32,265.903,265.903,120.345,14956.2,ok,ttft_proxy=batch_wall; vram_source=nvml; batch_generate=1; vllm=0.26.0
+2026-08-06T20:54:06Z,colab-t4,Qwen/Qwen2.5-0.5B-Instruct,2,23,32,210.426,210.426,152.073,14956.2,ok,ttft_proxy=batch_wall; vram_source=nvml; batch_generate=1; vllm=0.26.0
+2026-08-06T20:54:06Z,colab-t4,Qwen/Qwen2.5-0.5B-Instruct,4,23,32,215.632,215.632,148.401,14956.2,ok,ttft_proxy=batch_wall; vram_source=nvml; batch_generate=1; vllm=0.26.0
+2026-08-06T20:54:07Z,colab-t4,Qwen/Qwen2.5-0.5B-Instruct,8,23,32,228.654,228.654,139.949,14956.2,ok,ttft_proxy=batch_wall; vram_source=nvml; batch_generate=1; vllm=0.26.0

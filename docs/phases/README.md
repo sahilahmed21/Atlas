@@ -5,7 +5,7 @@
 | 0 | [phase-0](phase-0/) | Skeleton done |
 | 1 | [phase-1/START_HERE.md](phase-1/START_HERE.md) | Done — AC-001–AC-004 evidenced |
 | 2 | [phase-2](phase-2/) | Done — toys + `results/phase2/` |
-| 3 | [phase-3](phase-3/) | Offline harness/plot/source-diff done; **GPU CSV pending Colab** |
+| 3 | [phase-3](phase-3/) | **Done** — Colab T4 CSV + overlay |
 | 4 | [phase-4](phase-4/) | Blocked |
 | 5 | [phase-5](phase-5/) | Blocked |
 | 5.5 | [phase-5.5](phase-5.5/) | Blocked |

@@ -10,18 +10,19 @@
 ### 3.1 Same load shape as Phase 1
 - [x] Config: `configs/models/phase3.yaml` (same model revision + concurrency philosophy)
 - [x] Harness: `fundamentals/experiments/vllm_load.py` (offline helpers tested)
-- [ ] Save `results/phase3/vllm_load.csv` — **needs Colab/Kaggle**
+- [x] Save `results/phase3/vllm_load.csv` — Colab T4 via `phase3actual.ipynb`
 
 ### 3.2 Before/after chart
 - [x] Overlay plotter: `fundamentals/experiments/plot_naive_vs_vllm.py` (unit-tested)
-- [ ] `results/phase3/naive_vs_vllm.png` — **needs CSV**
-- [x] Caption stub: `01_before_after.md` (fill after GPU run)
+- [x] `results/phase3/naive_vs_vllm.png`
+- [x] Caption: `01_before_after.md`
 
 ### 3.3 Source reconciliation
 - [x] Diff vs toys: `02_source_diff.md` (tag `v0.26.0`)
 
 ### 3.4 Notebook
-- [x] `notebooks/colab/phase3_vllm.ipynb`
+- [x] `notebooks/colab/phase3_vllm.ipynb` (scaffold)
+- [x] `notebooks/colab/phase3actual.ipynb` (executed Colab run)
 
 ## Colab install (T4 / CUDA 12.x drivers)
 

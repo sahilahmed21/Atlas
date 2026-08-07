@@ -1,7 +1,7 @@
 # Acceptance Brief: Phase 3 vLLM reconciliation
 
-**Status:** Offline slice implemented; AC-005 pending Colab/Kaggle  
-**Revision:** 2  
+**Status:** Implemented + verified (AC-005 Colab T4)  
+**Revision:** 3  
 **Approval required before risky work:** No for offline harness/plot/source-diff; inventing GPU numbers forbidden
 
 ## Goal
@@ -86,4 +86,4 @@ Reconcile Phase 1 naive HF load against a pinned vLLM run on Colab/Kaggle T4, wi
 | AC-002 | `uv run pytest fundamentals/experiments/test_plot_naive_vs_vllm.py` → 4 passed | Done |
 | AC-003 | `uv run pytest fundamentals/experiments/test_vllm_load.py` → 4 passed | Done |
 | AC-004 | 02_source_diff.md @ tag v0.26.0 | Done |
-| AC-005 | results/phase3/* after Colab | Pending (needs GPU) |
+| AC-005 | `results/phase3/vllm_load.csv` + `naive_vs_vllm.png` + `01_before_after.md` (Colab T4) | Done |

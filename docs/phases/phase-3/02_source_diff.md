@@ -27,4 +27,13 @@ Evidence: [release](https://github.com/vllm-project/vllm/releases/tag/v0.26.0), 
 
 ## Runtime measurement status
 
-Source reconciliation above does **not** require a GPU. Measured `results/phase3/vllm_load.csv` / overlay chart remain **pending Colab/Kaggle T4** (AC-005).
+Measured on Colab T4 via `notebooks/colab/phase3actual.ipynb` (vLLM **0.26.0+cu129**):
+
+| N | batch wall (ms) | NVML used (MB) |
+| --- | --- | --- |
+| 1 | 266 | 14956 |
+| 2 | 210 | 14956 |
+| 4 | 216 | 14956 |
+| 8 | 229 | 14956 |
+
+Artifacts: `results/phase3/vllm_load.csv`, `naive_vs_vllm.png`. Caption: `01_before_after.md`.

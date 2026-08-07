@@ -76,7 +76,7 @@ Phase 3 vLLM: pin `0.26.0` via Colab `+cu129` wheel — see `docs/runbooks/COLAB
 - [x] Phase 0 skeleton + docs library
 - [x] Phase 1 memory math + naive baseline
 - [x] Phase 2 toy mechanisms
-- [ ] Phase 3 vLLM reconciliation
+- [x] Phase 3 vLLM reconciliation
 - [ ] Phase 4 platform + router
 - [ ] Phase 5 routing experiment
 - [ ] Phase 5.5 live dashboard
