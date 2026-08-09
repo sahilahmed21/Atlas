@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-10 (Phase 5 offline complete)  
 **Branch:** `master`  
-**HEAD:** *(update after matrix commit)* — Phase 5 routing matrix + control loop  
+**HEAD:** `7d1c198` — `feat: Phase 5 offline routing matrix — harness, SURPRISE, evidence`  
 **Next phase:** **Phase 5.5** — live dashboard (real metrics from Phase 4 `/metrics`; optional Colab behind gateway)  
 **Repo:** `C:/projects/Atlas`
 

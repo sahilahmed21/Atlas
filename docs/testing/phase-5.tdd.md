@@ -55,4 +55,4 @@ No coverage % tool. Deferred: live Colab dual-vLLM validation; TTFT load gate; s
 | --- | --- |
 | `6b4bba6` test: Phase 5 routing control-loop reproducers (RED) | RED |
 | `0ac1071` feat: Phase 5 routing control loop … (GREEN) | GREEN |
-| *(this commit)* feat: Phase 5 offline routing matrix + harness | matrix |
+| `7d1c198` feat: Phase 5 offline routing matrix + harness | matrix |
