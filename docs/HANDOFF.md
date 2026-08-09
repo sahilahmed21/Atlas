@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-10 (Phase 5 offline complete)  
 **Branch:** `master`  
-**HEAD:** `7d1c198` — `feat: Phase 5 offline routing matrix — harness, SURPRISE, evidence`  
+**HEAD:** `9c78de4` — Phase 5 offline complete (matrix `7d1c198` + handoff pin)  
 **Next phase:** **Phase 5.5** — live dashboard (real metrics from Phase 4 `/metrics`; optional Colab behind gateway)  
 **Repo:** `C:/projects/Atlas`
 
