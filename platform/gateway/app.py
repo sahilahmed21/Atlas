@@ -22,7 +22,7 @@ from atlas_metrics import AtlasMetrics
 from openai_worker_client import OpenAIWorkerClient
 from otel_hooks import begin_chat_span
 from rpm import RPM_SCOPE, ProcessLocalRPMLimiter
-from strategies import LeastLoadRouter, build_router
+from strategies import LeastLoadRouter, PrefixAwareRouter, build_router, shared_prefix_key
 from tenants import authenticate, load_tenants
 from workers_registry import load_workers, resolve_workers
 
@@ -63,10 +63,6 @@ def _bearer(authorization: str | None) -> str | None:
     if len(parts) != 2 or parts[0].lower() != "bearer":
         return None
     return parts[1].strip() or None
-
-
-def _prompt_text(messages: list[ChatMessage]) -> str:
-    return "\n".join(f"{m.role}: {m.content}" for m in messages)
 
 
 async def _call_chat(client: Any, payload: dict[str, Any]) -> dict[str, Any]:
@@ -114,12 +110,29 @@ def create_app(
     rpm = ProcessLocalRPMLimiter()
     client_cache: dict[str, Any] = {}
     cache_lock = threading.Lock()
+    route_lock = threading.Lock()
 
     def get_client(base_url: str) -> Any:
         with cache_lock:
             if base_url not in client_cache:
                 client_cache[base_url] = factory(base_url)
             return client_cache[base_url]
+
+    def _load_inc(worker_id: str) -> None:
+        with route_lock:
+            app.state.loads[worker_id] = app.state.loads.get(worker_id, 0) + 1
+
+    def _load_dec(worker_id: str) -> None:
+        with route_lock:
+            cur = app.state.loads.get(worker_id, 0)
+            app.state.loads[worker_id] = max(0, cur - 1)
+
+    def _claim_prefix(prefix_key: str, worker_id: str, cache_signal: str) -> None:
+        if cache_signal != "miss":
+            return
+        with route_lock:
+            # ponytail: no eviction; add LRU if unique-prefix map growth matters
+            app.state.prefix_owners[prefix_key] = worker_id
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -188,16 +201,19 @@ def create_app(
         stream_owns_cleanup = False
 
         try:
-            prompt = _prompt_text(body.messages)
+            prefix_key = shared_prefix_key(body.messages)
             choose_kwargs: dict[str, Any] = {}
             if isinstance(router, LeastLoadRouter):
                 choose_kwargs["loads"] = app.state.loads
-            if strategy == "prefix_aware":
-                choose_kwargs["prompt"] = prompt
+            if isinstance(router, PrefixAwareRouter):
+                choose_kwargs["prefix_key"] = prefix_key
                 choose_kwargs["prefix_owners"] = app.state.prefix_owners
+                choose_kwargs["loads"] = app.state.loads
 
             decision = router.choose(eligible, **choose_kwargs)
             worker = next(w for w in eligible if w.id == decision.worker_id)
+            _claim_prefix(prefix_key, worker.id, decision.cache_signal)
+            _load_inc(worker.id)
             span.set_attribute("atlas.worker_id", worker.id)
             span.set_attribute("atlas.cache_signal", decision.cache_signal)
 
@@ -244,6 +260,7 @@ def create_app(
                             tokens_per_s=timings.get("tokens_per_s"),
                         )
                         metrics.queue_dec()
+                        _load_dec(worker.id)
                         span.end()
                         span_ctx.__exit__(None, None, None)
 
@@ -307,6 +324,8 @@ def create_app(
             raise
         finally:
             if not stream_owns_cleanup:
+                if worker is not None:
+                    _load_dec(worker.id)
                 metrics.queue_dec()
                 span.end()
                 span_ctx.__exit__(None, None, None)
