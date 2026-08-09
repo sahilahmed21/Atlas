@@ -1,0 +1,13 @@
+pattern,strategy,n,ttft_p50_ms,ttft_p95_ms,tokens_per_s_mean,cache_hit_pct,worker_skew,worker_counts,worker_mode
+high_reuse,round_robin,24,147.5,281.25,8.685,0.0,0.5,"{'worker-a': 12, 'worker-b': 12}",simulated
+high_reuse,least_load,24,297.5,556.25,5.491,0.0,1.0,{'worker-a': 24},simulated
+high_reuse,prefix_aware,24,297.5,556.25,5.491,95.83,1.0,{'worker-a': 24},simulated
+low_reuse,round_robin,24,237.5,371.25,4.808,0.0,0.5,"{'worker-a': 12, 'worker-b': 12}",simulated
+low_reuse,least_load,24,387.5,646.25,3.35,0.0,1.0,{'worker-a': 24},simulated
+low_reuse,prefix_aware,24,387.5,646.25,3.35,0.0,1.0,{'worker-a': 24},simulated
+bursty,round_robin,24,167.5,281.25,8.222,0.0,0.5,"{'worker-a': 12, 'worker-b': 12}",simulated
+bursty,least_load,24,297.5,556.25,5.401,0.0,1.0,{'worker-a': 24},simulated
+bursty,prefix_aware,24,297.5,556.25,5.401,91.67,1.0,{'worker-a': 24},simulated
+steady,round_robin,24,147.5,281.25,8.685,0.0,0.5,"{'worker-a': 12, 'worker-b': 12}",simulated
+steady,least_load,24,297.5,556.25,4.769,0.0,1.0,{'worker-a': 24},simulated
+steady,prefix_aware,24,297.5,556.25,4.769,91.67,1.0,{'worker-a': 24},simulated

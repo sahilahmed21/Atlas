@@ -21,9 +21,11 @@
 
 ## Honest outcome requirement
 
-- [ ] At least one cell where prefix-aware is worse (latency or fairness or cache thrash)
-- [ ] Hypothesis for why, tested or strongly argued
-- [ ] Results: `results/phase5/` + `docs/experiments/routing_matrix.md`
+- [x] At least one cell where prefix-aware is worse (latency or fairness or cache thrash)
+- [x] Hypothesis for why, tested or strongly argued
+- [x] Results: `results/phase5/` + `docs/experiments/routing_matrix.md`
+
+**Closed offline** with `worker_mode=simulated`. Live Colab dual-vLLM validation optional. See `ACCEPTANCE.md` + `docs/testing/phase-5.tdd.md`.
 
 ## Free-path replica strategy
 

@@ -65,6 +65,7 @@ pythonpath = [
     "platform/observability",
     "platform/autoscaling",
     "workers",
+    "benchmarks",
 ]
 
 [[tool.uv.index]]

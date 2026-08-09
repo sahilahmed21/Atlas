@@ -1,6 +1,6 @@
 # Acceptance Brief: Phase 5 routing experiment
 
-**Status:** Draft — implementing offline  
+**Status:** Implemented (offline simulated) — AC-001–008 evidenced  
 **Revision:** 1  
 **Approval required before risky work:** No — offline/simulated workers only; inventing GPU TTFT/cache forbidden
 
@@ -125,7 +125,7 @@ Close the gateway routing control loop so prefix-aware and least-load are meanin
 
 | Criterion | Verification evidence | Status |
 | --- | --- | --- |
-| AC-001–002 | router pytest | Pending |
-| AC-003–005 | gateway routing-state pytest | Pending |
-| AC-006–007 | benchmarks harness pytest + runner | Pending |
-| AC-008 | SURPRISE.md + matrix doc | Pending |
+| AC-001–002 | router pytest | PASS |
+| AC-003–005 | gateway routing-state pytest | PASS |
+| AC-006–007 | benchmarks harness pytest + runner | PASS |
+| AC-008 | SURPRISE.md + matrix doc | PASS |

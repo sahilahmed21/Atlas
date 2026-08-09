@@ -1,9 +1,9 @@
 # Atlas session handoff
 
-**Date:** 2026-08-08 (updated after Phase 4 E2E offline)  
+**Date:** 2026-08-10 (Phase 5 offline complete)  
 **Branch:** `master`  
-**HEAD:** see `git log -1` — Phase 4 GREEN after `dcaa927` RED  
-**Next phase:** **Phase 5** — routing experiment (find where prefix-aware loses)  
+**HEAD:** *(update after matrix commit)* — Phase 5 routing matrix + control loop  
+**Next phase:** **Phase 5.5** — live dashboard (real metrics from Phase 4 `/metrics`; optional Colab behind gateway)  
 **Repo:** `C:/projects/Atlas`
 
 Paste this file (or `@docs/HANDOFF.md`) into a new chat to resume without rediscovery.
@@ -30,9 +30,9 @@ Framing: `docs/framing/ONE_SENTENCE.md` · Root: `README.md`
 | 1 Memory math + naive HF | **Done** | `results/phase1/oom_latency_curve.png` + CSV |
 | 2 Toy allocator / scheduler / prefix cache | **Done** | `results/phase2/*.csv` |
 | 3 vLLM reconciliation | **Done** | `results/phase3/naive_vs_vllm.png` + `vllm_load.csv` |
-| 4 Platform + router | **Done (offline)** | Gateway + router + `/metrics`; `32 passed` |
-| 5 Routing experiment | **Do next** | Find where prefix-aware **loses** |
-| 5.5 Live dashboard | Blocked on 5 metrics use | Real metrics only |
+| 4 Platform + router | **Done (offline + review fixes)** | Gateway/router/metrics |
+| 5 Routing experiment | **Done (offline sim)** | `results/phase5/` + SURPRISE — prefix-aware loses on high_reuse |
+| 5.5 Live dashboard | **Do next** | Real metrics only (from Phase 4 `/metrics`) |
 | 6 Write-up + pitch | Blocked | Honest constraint → future work |
 
 Phase index: `docs/phases/README.md`.
@@ -41,22 +41,22 @@ Phase index: `docs/phases/README.md`.
 
 ## 3. What recent sessions accomplished
 
-### Phase 4 E2E (this session)
-- AC-001–013 offline: RPM (process-local labeled), upstream SSE + TTFT timings, Prometheus request-path metrics, OTEL span hook, KEDA sketch, vLLM pin helper
-- TDD: RED `dcaa927` → GREEN (see `docs/testing/phase-4.tdd.md`)
-- Exa MCP unavailable; verified `/metrics` (`generate_latest`), SSE, KEDA shapes via web search
+### Phase 5 offline (`6b4bba6` RED → control-loop GREEN → matrix)
+- Shared prefix key; miss→least-load claim; gateway `prefix_owners` + `loads` ±1 (stream-safe)
+- Harness: `benchmarks/{traffic,fake_worker,run_routing_matrix}.py`
+- Matrix: high_reuse prefix-aware **95.8% hits but 2× worse TTFT p50 vs RR** (sticky saturation)
+- Evidence: `docs/testing/phase-5.tdd.md` · ACs: `docs/phases/phase-5/ACCEPTANCE.md`
 
-### Phase 4 scaffold (prior)
-- FastAPI gateway, YAML tenant/registry, round_robin / least_load / prefix_aware, fake-worker tests
-
-### Phase 3 (prior)
-- Colab T4 vLLM 0.26.0+cu129; `results/phase3/*`; cross-hardware overlay labeled
+### Phase 4 review fixes (prior)
+- RPM lock, client cache, async offload, OTEL stream, 502/auth/400
 
 **Do not force-push.** Push only if the user asks.
 
 ### Tests
-`uv run pytest platform workers -q` → **32 passed**  
-Fundamentals (last known): `25 passed`
+```powershell
+uv run pytest platform workers benchmarks -q   # 46 passed
+uv run python benchmarks/run_routing_matrix.py
+```
 
 ---
 
@@ -91,12 +91,17 @@ Data: `results/phase1/naive_load.csv`
 | 8 | 228.7 | 14956.2 | ok |
 
 - Overlay is **cross-hardware** (3050 vs T4)
-- ~15 GB flat NVML = vLLM KV **preallocation** on T4
-- Data: `results/phase3/vllm_load.csv` · Eye-stopper: `results/phase3/naive_vs_vllm.png`
+- Data: `results/phase3/vllm_load.csv`
 
-### Phase 4 — offline only (no new GPU numbers)
+### Phase 5 — offline simulated workers only
 
-Do not invent live TTFT/cache-hit rates. Metrics come from the gateway request path under test.
+| Cell | Finding |
+| --- | --- |
+| high_reuse × prefix_aware | hit% 95.83; skew 1.0; TTFT p50 **297.5** vs RR **147.5** |
+| Hypothesis | Sticky affinity saturates one replica; hit savings < saturation penalty |
+
+Data: `results/phase5/routing_matrix.csv` · `SURPRISE.md`  
+**Do not cite as GPU TTFT.**
 
 ---
 
@@ -108,29 +113,33 @@ Do not invent live TTFT/cache-hit rates. Metrics come from the gateway request p
 4. Phase 3 latency = **batch wall**, not streaming TTFT.
 5. Phase 3 VRAM = **NVML used**; Phase 1 = torch peak — different meters.
 6. Overlay **cross-hardware** must stay labeled.
-7. Never fake Phase 5 / 5.5 results or dashboard metrics.
-8. RPM + `atlas_queue_depth` are **process-local** (`x-atlas-rpm-scope: process-local`).
-9. KEDA YAML under `deploy/keda/` is a **planning sketch**, not a live run.
-10. Live Colab worker behind gateway is optional follow-up — not required to have closed Phase 4 offline.
+7. Never fake Phase 5.5 dashboard metrics.
+8. Phase 5 matrix is **`worker_mode=simulated`** — not Colab APC.
+9. RPM + `atlas_queue_depth` are **process-local**.
+10. RPM charges on **accept** (`try_acquire`), not on upstream success.
+11. KEDA YAML under `deploy/keda/` is a **planning sketch**, not a live run.
+12. Router `cache_signal` ≠ vLLM automatic prefix cache.
 
 ---
 
 ## 6. Code map
 
-### Phase 4 (complete offline)
+### Phase 5
 | Path | Role |
 | --- | --- |
-| `platform/gateway/app.py` | FastAPI chat + RPM + metrics + SSE passthrough |
-| `platform/tenant/tenants.py` + `rpm.py` | YAML tenants + process-local RPM |
-| `platform/registry/workers_registry.py` | YAML workers |
-| `platform/router/strategies.py` | RR / least-load / prefix-aware + `cache_signal` |
-| `platform/observability/atlas_metrics.py` | Prometheus request-path metrics |
-| `platform/observability/otel_hooks.py` | `atlas.chat_completions` span |
-| `workers/openai_worker_client.py` | JSON + stream client + timings |
-| `workers/vllm_pin.py` | Pin `0.26.0` |
-| `deploy/keda/atlas-queue-depth.yaml` | Planning sketch |
-| `docs/phases/phase-4/ACCEPTANCE.md` | AC-001–013 |
-| `docs/testing/phase-4.tdd.md` | RED/GREEN evidence |
+| `platform/router/strategies.py` | `shared_prefix_key`; miss→least-load |
+| `platform/gateway/app.py` | owner claim + loads ±1 |
+| `benchmarks/traffic.py` | frozen traces |
+| `benchmarks/fake_worker.py` | hit/miss + saturation latency |
+| `benchmarks/run_routing_matrix.py` | matrix runner |
+| `results/phase5/` | CSV + SURPRISE.md |
+
+### Phase 4 (still current)
+| Path | Role |
+| --- | --- |
+| `platform/gateway/app.py` | FastAPI chat + metrics + SSE |
+| `platform/observability/*` | Prometheus + OTEL |
+| `workers/openai_worker_client.py` | JSON + stream client |
 
 ### Dependency landmine
 - `pyproject.toml` `gpu = []` on purpose.
@@ -144,21 +153,21 @@ Do not invent live TTFT/cache-hit rates. Metrics come from the gateway request p
 ```powershell
 cd C:\projects\Atlas
 uv sync
-uv run pytest platform workers -q
-uv run pytest fundamentals/experiments fundamentals/allocators fundamentals/schedulers fundamentals/prefix_cache -q
+uv run pytest platform workers benchmarks -q
+uv run python benchmarks/run_routing_matrix.py
 
-# gateway (needs worker URLs in configs/models/workers.yaml)
+# gateway
 uv run uvicorn app:create_app_from_env --factory --app-dir platform/gateway --port 8080
 ```
 
 ---
 
-## 8. What to do next — Phase 5
+## 8. What to do next — Phase 5.5
 
-**Spec:** `docs/phases/phase-5/README.md`  
-**Goal:** Find where prefix-aware routing **loses** vs round-robin (surprising underperformance), with inspectable route reasons from Phase 4.
+**Spec:** `docs/phases/phase-5.5/README.md`  
+**Goal:** Live dashboard wired to Phase 4 `/metrics` (and route headers) — **no invented numbers**.
 
-Do not invent metrics. Prefer fake/time-sliced workers on laptop first; Colab when GPU truth is required.
+Optional (not blocking 5.5): Colab dual-vLLM re-run of high_reuse surprise cell; TTFT load gate.
 
 ---
 
@@ -177,10 +186,11 @@ Skills: **ponytail**, **karpathy-guidelines**, **tdd-workflow**, **intent-driven
 
 | Gap | Detail |
 | --- | --- |
-| No live gateway↔vLLM Colab run | Offline Phase 4 closed; optional follow-up |
+| Phase 5 = simulated only | No live gateway↔vLLM Colab matrix |
+| Sequential least_load skew | In-flight loads clear between requests → sticky first worker |
+| No TTFT load gate yet | Documented as follow-up after SURPRISE |
 | Process-local RPM/queue | Labeled; not multi-replica safe |
 | KEDA sketch | Not applied to a cluster |
-| Pitch | May still mix measured + future — keep honest |
 
 ---
 
@@ -189,10 +199,9 @@ Skills: **ponytail**, **karpathy-guidelines**, **tdd-workflow**, **intent-driven
 ```text
 Continue Atlas from @docs/HANDOFF.md.
 
-Phase 0–4 done offline (Phase 4: platform workers 32 passed; metrics from
-request path; RPM process-local labeled). Start Phase 5 per
-docs/phases/phase-5/README.md: find where prefix-aware routing loses vs
-round-robin. Use TDD + intent ACs. Do not invent dashboard metrics.
+Phase 0–5 done offline (Phase 5 matrix + SURPRISE; platform/workers/benchmarks 46 passed).
+Start Phase 5.5 per docs/phases/phase-5.5/README.md: live dashboard from real /metrics.
+Do not invent metrics. Respect honesty rules (simulated ≠ GPU; process-local RPM).
 ```
 
 ---
@@ -202,8 +211,9 @@ round-robin. Use TDD + intent ACs. Do not invent dashboard metrics.
 | Need | Path |
 | --- | --- |
 | Phase index | `docs/phases/README.md` |
-| Phase 4 ACs | `docs/phases/phase-4/ACCEPTANCE.md` |
-| Phase 4 TDD | `docs/testing/phase-4.tdd.md` |
-| Phase 5 start | `docs/phases/phase-5/README.md` |
+| Phase 5 ACs | `docs/phases/phase-5/ACCEPTANCE.md` |
+| Phase 5 TDD | `docs/testing/phase-5.tdd.md` |
+| Matrix | `docs/experiments/routing_matrix.md` |
+| Phase 5.5 start | `docs/phases/phase-5.5/README.md` |
 | Colab runbook | `docs/runbooks/COLAB_KAGGLE.md` |
 | MVP architecture | `docs/architecture/MVP_ARCHITECTURE.md` |
