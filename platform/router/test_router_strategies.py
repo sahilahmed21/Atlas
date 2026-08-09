@@ -64,7 +64,44 @@ def test_prefix_aware_deterministic_fallback_when_unknown():
 
     assert d1.worker_id == d2.worker_id
     assert d1.strategy == "prefix_aware"
-    assert "fallback" in d1.reason.lower()
+    assert d1.cache_signal == "miss"
+
+
+def test_shared_prefix_key_ignores_unique_user_suffix():
+    from strategies import shared_prefix_key
+
+    system = "You are Atlas."
+    a = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": "ask about cats"},
+    ]
+    b = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": "ask about dogs"},
+    ]
+    assert shared_prefix_key(a) == shared_prefix_key(b)
+    assert shared_prefix_key(a) != shared_prefix_key(
+        [{"role": "system", "content": "Other system."}, {"role": "user", "content": "x"}]
+    )
+
+
+def test_prefix_aware_miss_claims_via_least_load():
+    from strategies import PrefixAwareRouter
+
+    router = PrefixAwareRouter()
+    workers = _workers()
+    loads = {"worker-a": 4, "worker-b": 0, "worker-c": 2}
+
+    decision = router.choose(
+        workers,
+        prefix_key="abc123",
+        prefix_owners={},
+        loads=loads,
+    )
+
+    assert decision.worker_id == "worker-b"
+    assert decision.cache_signal == "miss"
+    assert decision.strategy == "prefix_aware"
 
 
 def test_choose_raises_when_no_workers():
