@@ -4,16 +4,16 @@
 
 ## Must show live
 
-- [ ] Ingest / route decision per request
-- [ ] Cache hit vs miss
-- [ ] TTFT + tokens/s time series
-- [ ] Which replica (time-sliced process id is fine)
+- [x] Ingest / route decision per request
+- [x] Cache hit vs miss
+- [x] TTFT + tokens/s time series
+- [x] Which replica (time-sliced process id is fine)
 
 ## Deliverable
 
-- [ ] `dashboard/` app (simplest stack that works — prefer stdlib/SSE or existing React if already natural)
-- [ ] 90-second demo video (link in `docs/phases/phase-5.5/DEMO.md`)
-- [ ] Do **not** fake metrics — wire to Phase 4 observability
+- [x] `dashboard/` app (stdlib HTML+JS served by gateway)
+- [ ] 90-second demo video (link in `docs/phases/phase-5.5/DEMO.md`) — **manual follow-up**
+- [x] Do **not** fake metrics — wire to Phase 4 observability (+ event ring)
 
 ## Context
 

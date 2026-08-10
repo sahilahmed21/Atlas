@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Atlas live dashboard</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b9bb4;
+      --hit: #3d9a6a;
+      --miss: #c47a3a;
+      --accent: #5b8def;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 1.25rem;
+    }
+    h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+    .banner {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+      max-width: 52rem;
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; }
+    .card {
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      min-width: 8rem;
+    }
+    .card strong { display: block; font-size: 1.4rem; }
+    .card span { color: var(--muted); font-size: 0.75rem; }
+    label { color: var(--muted); font-size: 0.8rem; }
+    input {
+      background: #0c1017;
+      border: 1px solid #2a3548;
+      color: var(--text);
+      padding: 0.4rem 0.6rem;
+      border-radius: 4px;
+      min-width: 16rem;
+    }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: 0;
+      border-radius: 4px;
+      padding: 0.45rem 0.9rem;
+      cursor: pointer;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid #243044; }
+    th { color: var(--muted); font-weight: 600; }
+    .hit { color: var(--hit); }
+    .miss { color: var(--miss); }
+    #clock { font-variant-numeric: tabular-nums; }
+    #chart {
+      height: 80px;
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      background: var(--panel);
+      padding: 0.5rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+    #chart i {
+      display: block;
+      width: 6px;
+      background: var(--accent);
+      border-radius: 2px 2px 0 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Atlas live dashboard</h1>
+  <p class="banner">
+    Honesty: metrics come from the gateway <strong>request path</strong> only
+    (same observe site as Prometheus). Queue depth and RPM are
+    <strong>process-local</strong>. Router cache_signal is not vLLM APC.
+    Simulated workers are fine for demos when labeled.
+  </p>
+
+  <div class="row">
+    <div>
+      <label for="apiKey">API key</label><br />
+      <input id="apiKey" type="password" value="sk-atlas-demo-key" autocomplete="off" />
+      <button id="connectBtn" type="button">Connect</button>
+    </div>
+    <div class="card"><span>Live clock</span><strong id="clock">—</strong></div>
+    <div class="card"><span>Events</span><strong id="nEvents">0</strong></div>
+    <div class="card"><span>Hits</span><strong id="nHits">0</strong></div>
+    <div class="card"><span>Misses</span><strong id="nMisses">0</strong></div>
+    <div class="card"><span>Status</span><strong id="status">idle</strong></div>
+  </div>
+
+  <div id="chart" aria-label="TTFT bars"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Worker</th>
+        <th>Strategy</th>
+        <th>Cache</th>
+        <th>TTFT ms</th>
+        <th>tok/s</th>
+        <th>Reason</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <script>
+    const state = { hits: 0, misses: 0, n: 0, lastId: 0, es: null, ttfts: [] };
+
+    function tick() {
+      document.getElementById("clock").textContent = new Date().toISOString();
+    }
+    setInterval(tick, 250);
+    tick();
+
+    function renderChart() {
+      const el = document.getElementById("chart");
+      el.innerHTML = "";
+      const vals = state.ttfts.slice(-60);
+      const max = Math.max(1, ...vals);
+      for (const v of vals) {
+        const bar = document.createElement("i");
+        bar.style.height = Math.max(4, (v / max) * 64) + "px";
+        bar.title = v + " ms";
+        el.appendChild(bar);
+      }
+    }
+
+    function addEvent(ev) {
+      if (!ev || ev.id <= state.lastId) return;
+      state.lastId = ev.id;
+      state.n += 1;
+      if (ev.cache_signal === "hit") state.hits += 1;
+      if (ev.cache_signal === "miss") state.misses += 1;
+      document.getElementById("nEvents").textContent = String(state.n);
+      document.getElementById("nHits").textContent = String(state.hits);
+      document.getElementById("nMisses").textContent = String(state.misses);
+
+      if (ev.ttft_ms != null) {
+        state.ttfts.push(Number(ev.ttft_ms));
+        renderChart();
+      }
+
+      const tr = document.createElement("tr");
+      const t = new Date((ev.ts || 0) * 1000).toISOString().slice(11, 23);
+      const cacheClass = ev.cache_signal === "hit" ? "hit" : (ev.cache_signal === "miss" ? "miss" : "");
+      tr.innerHTML =
+        "<td>" + t + "</td>" +
+        "<td>" + (ev.worker_id || "") + "</td>" +
+        "<td>" + (ev.strategy || "") + "</td>" +
+        "<td class=\"" + cacheClass + "\">" + (ev.cache_signal || "") + "</td>" +
+        "<td>" + (ev.ttft_ms != null ? Number(ev.ttft_ms).toFixed(1) : "—") + "</td>" +
+        "<td>" + (ev.tokens_per_s != null ? Number(ev.tokens_per_s).toFixed(1) : "—") + "</td>" +
+        "<td>" + (ev.reason || "") + "</td>";
+      const body = document.getElementById("tbody");
+      body.insertBefore(tr, body.firstChild);
+      while (body.children.length > 80) body.removeChild(body.lastChild);
+    }
+
+    async function bootstrap(key) {
+      const res = await fetch("/atlas/snapshot?limit=50&api_key=" + encodeURIComponent(key));
+      if (!res.ok) throw new Error("snapshot " + res.status);
+      const data = await res.json();
+      for (const ev of (data.events || [])) addEvent(ev);
+    }
+
+    function connectSse(key) {
+      if (state.es) state.es.close();
+      const url = "/atlas/events?api_key=" + encodeURIComponent(key) + "&after=" + state.lastId;
+      const es = new EventSource(url);
+      state.es = es;
+      document.getElementById("status").textContent = "connecting";
+      es.onopen = () => { document.getElementById("status").textContent = "live"; };
+      es.onerror = () => { document.getElementById("status").textContent = "reconnecting"; };
+      es.onmessage = (msg) => {
+        try { addEvent(JSON.parse(msg.data)); } catch (_) {}
+      };
+    }
+
+    document.getElementById("connectBtn").onclick = async () => {
+      const key = document.getElementById("apiKey").value.trim();
+      try {
+        await bootstrap(key);
+        connectSse(key);
+      } catch (e) {
+        document.getElementById("status").textContent = String(e.message || e);
+      }
+    };
+  </script>
+</body>
+</html>

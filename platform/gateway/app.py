@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -11,9 +12,10 @@ from pathlib import Path
 from typing import Any, AsyncIterator, Callable
 
 import httpx
-from fastapi import FastAPI, Header, Request
+from fastapi import FastAPI, Header, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from opentelemetry import trace
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel
@@ -63,6 +65,11 @@ def _bearer(authorization: str | None) -> str | None:
     if len(parts) != 2 or parts[0].lower() != "bearer":
         return None
     return parts[1].strip() or None
+
+
+def _api_key(authorization: str | None, api_key: str | None) -> str | None:
+    """Bearer preferred; query api_key allowed for EventSource (demo)."""
+    return _bearer(authorization) or (api_key.strip() if api_key else None)
 
 
 async def _call_chat(client: Any, payload: dict[str, Any]) -> dict[str, Any]:
@@ -168,6 +175,50 @@ def create_app(
             media_type=CONTENT_TYPE_LATEST,
         )
 
+    @app.get("/atlas/snapshot")
+    def atlas_snapshot(
+        authorization: str | None = Header(default=None),
+        api_key: str | None = Query(default=None),
+        limit: int = Query(default=50, ge=1, le=500),
+        after: int = Query(default=0, ge=0),
+    ):
+        if authenticate(tenants, _api_key(authorization, api_key)) is None:
+            return _error(401, "Invalid API key", "authentication_error")
+        return {
+            "events": metrics.events.snapshot(limit=limit, after=after),
+            "scope": "process-local",
+        }
+
+    @app.get("/atlas/events")
+    async def atlas_events(
+        authorization: str | None = Header(default=None),
+        api_key: str | None = Query(default=None),
+        after: int = Query(default=0, ge=0),
+        catchup_only: bool = Query(default=False),
+    ):
+        if authenticate(tenants, _api_key(authorization, api_key)) is None:
+            return _error(401, "Invalid API key", "authentication_error")
+
+        async def event_feed():
+            cursor = after
+            for row in metrics.events.snapshot(limit=200, after=cursor):
+                cursor = int(row["id"])
+                yield f"data: {json.dumps(row)}\n\n"
+            if catchup_only:
+                return
+            while True:
+                newer = await asyncio.to_thread(
+                    lambda c=cursor: metrics.events.wait_after(c, timeout=1.0)
+                )
+                if not newer:
+                    yield ": ping\n\n"
+                    continue
+                for ev in newer:
+                    cursor = ev.id
+                    yield f"data: {json.dumps(ev.as_public_dict())}\n\n"
+
+        return StreamingResponse(event_feed(), media_type="text/event-stream")
+
     @app.post("/v1/chat/completions")
     async def chat_completions(
         body: ChatCompletionRequest,
@@ -258,6 +309,7 @@ def create_app(
                             ttft_ms=timings.get("ttft_ms"),
                             completion_ms=timings.get("completion_ms"),
                             tokens_per_s=timings.get("tokens_per_s"),
+                            reason=decision.reason,
                         )
                         metrics.queue_dec()
                         _load_dec(worker.id)
@@ -286,6 +338,7 @@ def create_app(
                     outcome="error",
                     cache_signal=decision.cache_signal,
                     completion_ms=(time.perf_counter() - t0) * 1000,
+                    reason=decision.reason,
                 )
                 msg = "Worker request failed"
                 if isinstance(exc, httpx.HTTPStatusError):
@@ -305,6 +358,7 @@ def create_app(
                 ttft_ms=timings.get("ttft_ms"),
                 completion_ms=timings.get("completion_ms"),
                 tokens_per_s=timings.get("tokens_per_s"),
+                reason=decision.reason,
             )
             return JSONResponse(content=upstream, headers=route_headers)
         except Exception:
@@ -320,6 +374,7 @@ def create_app(
                     outcome="error",
                     cache_signal=decision.cache_signal,
                     completion_ms=(time.perf_counter() - t0) * 1000,
+                    reason=decision.reason,
                 )
             raise
         finally:
@@ -333,6 +388,14 @@ def create_app(
     @app.get("/healthz")
     async def healthz():
         return {"status": "ok"}
+
+    dash_dir = Path(__file__).resolve().parents[2] / "dashboard"
+    if dash_dir.is_dir():
+        app.mount(
+            "/dashboard",
+            StaticFiles(directory=str(dash_dir), html=True),
+            name="dashboard",
+        )
 
     return app
 

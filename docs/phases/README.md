@@ -8,7 +8,7 @@
 | 3 | [phase-3](phase-3/) | **Done** — Colab T4 CSV + overlay |
 | 4 | [phase-4](phase-4/) | **Done** (offline) — gateway/router/metrics; live vLLM optional |
 | 5 | [phase-5](phase-5/) | **Done** (offline sim) — matrix + SURPRISE |
-| 5.5 | [phase-5.5](phase-5.5/) | Blocked on live metrics desire |
-| 6 | [phase-6](phase-6/) | Blocked |
+| 5.5 | [phase-5.5](phase-5.5/) | **Done** (live UI; video deferred) |
+| 6 | [phase-6](phase-6/) | **Do next** |
 
 Rule: never skip eye-stopper artifacts. Phase 2 without Phase 1 curve = theater.

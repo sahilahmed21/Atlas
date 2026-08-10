@@ -124,16 +124,13 @@ def test_atlas_events_sse_emits_after_chat(tmp_path: Path):
     )
     assert chat.status_code == 200
 
-    with client.stream("GET", "/atlas/events?api_key=sk-atlas-demo-key&after=0") as sse:
+    with client.stream(
+        "GET",
+        "/atlas/events?api_key=sk-atlas-demo-key&after=0&catchup_only=true",
+    ) as sse:
         assert sse.status_code == 200
         assert "text/event-stream" in sse.headers.get("content-type", "")
-        chunks = []
-        for line in sse.iter_lines():
-            if line:
-                chunks.append(line)
-            if any("worker_id" in c for c in chunks):
-                break
-        text = "\n".join(chunks)
+        text = "".join(sse.iter_text())
         assert "data:" in text
         assert "worker_id" in text
 

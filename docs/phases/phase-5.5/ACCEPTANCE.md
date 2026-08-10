@@ -1,6 +1,6 @@
 # Acceptance Brief: Phase 5.5 live dashboard
 
-**Status:** Draft — implementing  
+**Status:** Implemented (offline demo path) — AC-001–007; video deferred  
 **Revision:** 1  
 **Approval required before risky work:** No — offline/fake-worker demo path; inventing metrics forbidden
 
@@ -88,6 +88,6 @@ Show a live per-request feed (replica, route reason, cache signal, TTFT/tokens/s
 
 | Criterion | Evidence | Status |
 | --- | --- | --- |
-| AC-001–002 | observability unit tests | Pending |
-| AC-003–006 | gateway live + dashboard tests | Pending |
-| AC-007 | DEMO + HANDOFF | Pending |
+| AC-001–002 | observability unit tests | PASS |
+| AC-003–006 | gateway live + dashboard tests | PASS |
+| AC-007 | DEMO + HANDOFF | PASS (video link empty by design) |

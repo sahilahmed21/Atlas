@@ -4,10 +4,17 @@ from __future__ import annotations
 
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 
+from request_events import RequestEventLog
+
 
 class AtlasMetrics:
-    def __init__(self, registry: CollectorRegistry | None = None) -> None:
+    def __init__(
+        self,
+        registry: CollectorRegistry | None = None,
+        events: RequestEventLog | None = None,
+    ) -> None:
         self.registry = registry or CollectorRegistry()
+        self.events = events if events is not None else RequestEventLog()
         self.requests = Counter(
             "atlas_requests_total",
             "Chat completion requests handled by the gateway",
@@ -53,6 +60,9 @@ class AtlasMetrics:
     def queue_dec(self) -> None:
         self.queue_depth.dec()
 
+    def queue_value(self) -> float:
+        return float(self.queue_depth._value.get())  # type: ignore[attr-defined]
+
     def observe_request(
         self,
         *,
@@ -64,6 +74,7 @@ class AtlasMetrics:
         ttft_ms: float | None = None,
         completion_ms: float | None = None,
         tokens_per_s: float | None = None,
+        reason: str = "",
     ) -> None:
         self.requests.labels(
             tenant=tenant_id,
@@ -78,3 +89,15 @@ class AtlasMetrics:
             self.completion.labels(worker_id=worker_id).observe(completion_ms)
         if tokens_per_s is not None:
             self.tokens.labels(worker_id=worker_id).observe(tokens_per_s)
+        self.events.publish(
+            tenant_id=tenant_id,
+            strategy=strategy,
+            worker_id=worker_id,
+            reason=reason,
+            cache_signal=cache_signal,
+            outcome=outcome,
+            ttft_ms=ttft_ms,
+            completion_ms=completion_ms,
+            tokens_per_s=tokens_per_s,
+            queue_depth=self.queue_value(),
+        )

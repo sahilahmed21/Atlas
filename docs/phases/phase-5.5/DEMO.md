@@ -1,7 +1,22 @@
 # Phase 5.5 — Demo script (90s)
 
-**Status:** Not recorded — this phase depends on real Phase 4 request metrics and a completed Phase 5
-counterexample. Do not add a video link until the recording can show those artifacts live.
+**Status:** App ready — video not recorded yet.
+
+## Live demo runbook (laptop)
+
+1. Start gateway with dual fake/sim workers (or point `configs/models/workers.yaml` at real OpenAI-compatible endpoints).
+2. Open `http://127.0.0.1:8080/dashboard/` — click **Connect** with `sk-atlas-demo-key`.
+3. Fire load (same traces as Phase 5): high_reuse then switch `ATLAS_STRATEGY` / restart with `prefix_aware` vs `round_robin`.
+4. Show live clock, worker column, cache hit/miss, TTFT bars, route reason.
+5. Close with Phase 5 surprise cell (`results/phase5/SURPRISE.md`): prefix-aware can win hits and lose latency.
+
+```powershell
+cd C:\projects\Atlas
+$env:ATLAS_STRATEGY = "prefix_aware"
+uv run uvicorn app:create_app_from_env --factory --app-dir platform/gateway --port 8080
+```
+
+For a one-process demo without real GPUs, inject `SimulatedWorkerClient` the same way tests/harness do (factory), or run chat completions against any OpenAI-compatible stub on 8001/8002.
 
 1. **0–10s — constraint and scope.** State that Atlas measures serving behavior on a laptop/free-tier
    T4 and does not claim multi-node or RDMA deployment. Show the MVP architecture only.
