@@ -45,4 +45,4 @@ No coverage % tool. Deferred: 90s demo video recording; Grafana primary UX; mult
 | Commit | Stage |
 | --- | --- |
 | `d2d01e4` test: Phase 5.5 … (RED) | RED |
-| *(GREEN commit)* feat: Phase 5.5 live events + dashboard | GREEN |
+| `ea84aa0` feat: Phase 5.5 live events + dashboard | GREEN |

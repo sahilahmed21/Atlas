@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-10 (Phase 5.5 live dashboard)  
 **Branch:** `master`  
-**HEAD:** *(update after GREEN commit)*  
+**HEAD:** `ea84aa0` — `feat: Phase 5.5 live event feed + dashboard (GREEN)`  
 **Next phase:** **Phase 6** — honest write-up + pitch  
 **Repo:** `C:/projects/Atlas`
 
