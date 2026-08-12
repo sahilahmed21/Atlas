@@ -10,8 +10,8 @@
 | 5 | [phase-5](phase-5/) | **Done** (offline sim) — matrix + SURPRISE |
 | 5.5 | [phase-5.5](phase-5.5/) | **Done** (live UI; video deferred → Phase 9) |
 | 6 | [phase-6](phase-6/) | **Done** — claim inventory + pitch + resume |
-| 7 | [phase-7/START_HERE.md](phase-7/START_HERE.md) | **Do next** — live GPU routing validation |
-| 8 | [phase-8](phase-8/) | Planned — TTFT / load gate |
+| 7 | [phase-7/START_HERE.md](phase-7/START_HERE.md) | **Done** — live WEAKENED (~1.17×); `results/phase5-live/` |
+| 8 | [phase-8](phase-8/) | **Do next** — TTFT / load gate |
 | 9 | [phase-9](phase-9/) | Planned — demo video + public shock package |
 | 10 | [phase-10](phase-10/) | Optional — one JD widener after 9 |
 

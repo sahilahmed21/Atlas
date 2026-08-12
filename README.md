@@ -86,7 +86,8 @@ Phase 3 vLLM: pin `0.26.0` via Colab `+cu129` wheel — see `docs/runbooks/COLAB
 3. **Built** — Phase 2 CPU toys ≠ Phase 4+ FastAPI gateway/router (`platform/`).
 4. **Surprise** — offline high_reuse: prefix-aware wins hits, **loses** simulated TTFT vs RR (`results/phase5/SURPRISE.md`).
 5. **Live** — `/dashboard/` from request-path events (video deferred).
-6. **Hire-signal next** — Phase 7 live GPU validate → 8 load gate → 9 demo/public package ([NEXT_ARC](docs/phases/NEXT_ARC.md)).
+6. **Live (WEAKENED)** — dual vLLM T4: sticky still ~1.17× slower p50 than RR; affinity/skew match sim (`results/phase5-live/`).
+7. **Next** — Phase 8 load gate → Phase 9 demo/public ([NEXT_ARC](docs/phases/NEXT_ARC.md)).
 
 Pitch: [`docs/pitch/ONE_PARAGRAPH.md`](docs/pitch/ONE_PARAGRAPH.md) · Phase 6: [`docs/phases/phase-6/`](docs/phases/phase-6/)
 
@@ -100,7 +101,7 @@ Pitch: [`docs/pitch/ONE_PARAGRAPH.md`](docs/pitch/ONE_PARAGRAPH.md) · Phase 6: 
 - [x] Phase 5 routing experiment (offline sim)
 - [x] Phase 5.5 live dashboard (video deferred → Phase 9)
 - [x] Phase 6 honest write-up + pitch
-- [ ] Phase 7 live GPU routing validation
+- [x] Phase 7 live GPU routing validation (WEAKENED)
 - [ ] Phase 8 TTFT / load gate
 - [ ] Phase 9 shock package (demo + public)
 - [ ] Phase 10 optional widener
