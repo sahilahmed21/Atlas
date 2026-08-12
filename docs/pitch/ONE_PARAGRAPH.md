@@ -1,17 +1,5 @@
-# One-paragraph pitch (draft)
+# One-paragraph pitch
 
-**Status:** Phase 6 draft. Only the Phase 1 failure curve is currently an artifact; the remaining
-claims below are the intended narrative and must be revised as phases ship.
+**Status:** Phase 6 final — every clause is inventory-backed (`docs/phases/phase-6/CLAIM_INVENTORY.md`).
 
-Atlas is a research-oriented LLM serving project for demonstrating production multi-tenant serving
-*behavior* on constrained free-tier GPUs rather than assuming multi-node RDMA infrastructure. Its
-first measured artifact is a Qwen2.5-0.5B HuggingFace baseline on a 4 GiB RTX 3050: at N=8,
-median latency reached 9242 ms, 5.5× the N=1 baseline, while peak VRAM remained about 1.04 GiB.
-Next, Atlas will build readable allocation, batching, and prefix-cache simulations; reconcile them
-against a pinned vLLM run; and test cache-aware routing against simple baselines, including a case
-where it loses. The eventual public artifact set is the Phase 1 failure curve, a vLLM comparison,
-the routing matrix, and a dashboard backed by the same request path—not a claim that unbuilt
-components already run in production.
-
-Rehearse only the measured Phase 1 paragraph today. Promote later clauses from future tense only
-when their named file, run, and chart exist.
+Atlas demonstrates production-grade multi-tenant LLM serving *behavior* on constrained free-path GPUs (laptop RTX 3050 4 GiB + Colab/Kaggle T4) without assuming multi-node or RDMA. On the 3050, a concurrent HuggingFace baseline of Qwen2.5-0.5B hits a **5.5×** median latency cliff at N=8 (**9242 ms** vs **1671 ms** at N=1) while peak VRAM stays ~1.04 GiB (`results/phase1/`). CPU toys for paging, continuous batching, and prefix cache (`results/phase2/`) sit beside a pinned vLLM **0.26.0** T4 run whose naive overlay is labeled **cross-hardware** (`results/phase3/`). A FastAPI OpenAI-compatible gateway with YAML tenants, process-local RPM, and cache-aware routing (`platform/`) was then stress-tested offline: under **high_reuse**, prefix-aware routing reaches **95.8%** router hits yet **2× worse** simulated TTFT p50 than round-robin because sticky affinity saturates one replica (`results/phase5/SURPRISE.md`). A live dashboard reads the same request-path event ring as Prometheus (`/dashboard/`; video deferred). Prefill/decode disaggregation and RDMA remain informed future work on hardware this free path does not have.

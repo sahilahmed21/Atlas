@@ -34,7 +34,10 @@ Under **sequential** replay, process-local in-flight `loads` return to 0 between
 - Router `cache_signal` ≠ engine automatic prefix cache.
 - No claim that round-robin always wins on GPU.
 
-## Follow-up (out of scope for Phase 5 close)
+## Follow-up (hire-signal arc)
 
-- Optional Colab dual time-sliced vLLM re-run of the high_reuse surprise cell.
-- TTFT load gate on `PrefixAwareRouter` once the loss case is accepted.
+- **Phase 7:** Colab dual time-sliced vLLM re-run of the high_reuse surprise cell → `results/phase5-live/`
+- **Phase 8:** TTFT / load gate on `PrefixAwareRouter`
+- **Phase 9:** 90s demo + public package
+
+See `docs/phases/NEXT_ARC.md`.

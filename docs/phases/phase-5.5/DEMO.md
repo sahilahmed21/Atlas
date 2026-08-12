@@ -35,4 +35,4 @@ For a one-process demo without real GPUs, inject `SimulatedWorkerClient` the sam
 - [ ] Redact API keys and user text before publishing.
 - [ ] Verify the video has audio/captions and a stable link.
 
-**Video link:** Not recorded.
+**Video link:** Not recorded — tracking moved to **Phase 9** (`docs/phases/phase-9/`). Use this runbook when recording.
