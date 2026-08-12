@@ -1,8 +1,9 @@
 # Acceptance Brief: Phase 7 live GPU routing validation
 
-**Status:** Not started  
-**Revision:** 1  
-**Approval required before risky work:** Yes — Colab GPU cost/time; inventing GPU numbers forbidden
+**Status:** In progress — AC-001 infra PASS (2026-08-12); AC-002–005 blocked on live tip ≥ `517a309` (see RUN_LOG.md)  
+**Revision:** 2  
+**Approval required before risky work:** Yes — Colab GPU cost/time; inventing GPU numbers forbidden  
+**Honesty:** 2026-08-12 matrix output under `results/phase5/` is **simulated** — not Phase 7 evidence
 
 ## Goal
 

@@ -1,6 +1,6 @@
 # Runbook — Colab / Kaggle
 
-Uses **uv** for Phase 1–2 deps. Phase 3 vLLM is installed **separately** (pin `0.26.0`).
+Uses **uv** for Phase 1–2 deps. Phase 3/7 vLLM is installed **separately** (pin `0.26.0`).
 
 1. Runtime → GPU (T4).  
 2. Clone or upload this repo.  
@@ -17,7 +17,18 @@ Uses **uv** for Phase 1–2 deps. Phase 3 vLLM is installed **separately** (pin 
 7. Run `python fundamentals/experiments/vllm_load.py` then `plot_naive_vs_vllm.py`.  
 8. Download `results/phase3/` before the session dies.
 
+## Phase 7 live routing (dual vLLM)
+
+Notebook: `docs/runbooks/atlasP5live.ipynb` · Log: `docs/phases/phase-7/RUN_LOG.md`
+
+1. **Git tip ≥ `517a309`** (live harness). After clone: `git log -1 --oneline` and  
+   `uv run python benchmarks/run_routing_matrix.py --help | grep worker-mode`  
+   If grep is empty → **STOP** (old tip silently runs Phase 5 sim).
+2. Start two servers, util ≈0.4 each, ports 8001/8002, model `Qwen/Qwen2.5-0.5B-Instruct`.
+3. Smoke `/v1/models` + one chat each.
+4. Run `--worker-mode live` → expect `results/phase5-live/routing_matrix_live.csv` with `worker_mode=live`.
+
 ## Disconnect survival
 
-- CSV appends after every concurrency step.  
+- CSV appends after every concurrency step (Phase 3).  
 - Prefer Drive mount or frequent download on Colab.

@@ -4,20 +4,33 @@
 
 | File | Role |
 | --- | --- |
-| `routing_matrix_live.csv` | GPU-backed matrix rows (`worker_mode=live`) |
-| `SURPRISE_GPU.md` | Verdict vs Phase 5 sim — write after the Colab run |
-| `README.md` | This file — reproduce notes |
+| `routing_matrix_live.csv` | GPU-backed matrix (`worker_mode=live`) — **not present yet** |
+| `SURPRISE_GPU.md` | Verdict vs Phase 5 sim — after a valid live run |
+| `README.md` | This file |
 
-## Reproduce (after dual vLLM is up)
+## Session 2026-08-12
+
+- Dual vLLM on Colab T4 **worked** (8001+8002, util 0.4 each). See `docs/phases/phase-7/RUN_LOG.md`.
+- Matrix cell ran on git tip **without** live harness → sim CSV under `results/phase5/` only.
+- **Do not** treat those simulated TTFT/hit% rows as Phase 7 evidence.
+
+## Reproduce (valid live run)
+
+**Prerequisite:** tree ≥ `517a309` (`feat: Phase 7 live routing matrix harness`). Confirm:
+
+```bash
+uv run python benchmarks/run_routing_matrix.py --help | grep worker-mode
+```
+
+Then, with workers on :8001 and :8002:
 
 ```powershell
-# From repo root, with workers on :8001 and :8002
 uv run python benchmarks/run_routing_matrix.py --worker-mode live `
   --patterns high_reuse --strategies round_robin,prefix_aware --n 24 `
   --hardware colab-t4 --vllm-version 0.26.0 `
   --replica-mode time_sliced_dual
 ```
 
-Label `replica_mode=sequential_isolated` if dual concurrent OOM forced sequential runs.
+Expect: `wrote .../results/phase5-live/routing_matrix_live.csv` and every row `worker_mode=live`.
 
-Until a real GPU CSV exists: cite only `results/phase5/` and label it `worker_mode=simulated`.
+Until that file exists: cite only `results/phase5/` as `worker_mode=simulated`.

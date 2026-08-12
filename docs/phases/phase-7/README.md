@@ -1,10 +1,11 @@
 # Phase 7 — Live GPU routing validation
 
-**Status:** Not started  
+**Status:** In progress — dual-vLLM **infra PASS** (2026-08-12); live matrix **blocked** until Colab uses tip ≥ `517a309`  
 **Hardware:** Colab/Kaggle T4 — time-sliced dual vLLM preferred  
 **Eye-stopper:** `results/phase5-live/` — GPU CSV + `SURPRISE_GPU.md`  
-**ACs:** [ACCEPTANCE.md](ACCEPTANCE.md) · **Start:** [START_HERE.md](START_HERE.md)  
-**Prior art:** `results/phase5/SURPRISE.md` (simulated only)
+**ACs:** [ACCEPTANCE.md](ACCEPTANCE.md) · **Start:** [START_HERE.md](START_HERE.md) · **Log:** [RUN_LOG.md](RUN_LOG.md)  
+**Prior art:** `results/phase5/SURPRISE.md` (simulated only)  
+**Notebook:** `docs/runbooks/atlasP5live.ipynb`
 
 ## Goal
 

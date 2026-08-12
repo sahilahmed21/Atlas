@@ -1,6 +1,6 @@
 # Phase 7 — START HERE (live GPU routing validation)
 
-**Status:** Not started  
+**Status:** In progress — infra PASS; live CSV pending (see [RUN_LOG.md](RUN_LOG.md))  
 **Hardware:** Colab/Kaggle T4 — **time-sliced dual vLLM** (or sequential isolated runs if dual concurrent OOM)  
 **Eye-stopper:** GPU-backed high_reuse cell in `results/phase5-live/`
 
@@ -10,18 +10,20 @@ Phase 5 proved the surprise **offline** (`worker_mode=simulated`). Interviewers 
 
 ## Do in order
 
-1. Read [README.md](README.md) + [ACCEPTANCE.md](ACCEPTANCE.md)
+1. Read [README.md](README.md) + [ACCEPTANCE.md](ACCEPTANCE.md) + [RUN_LOG.md](RUN_LOG.md)
 2. Read free-path replica notes: `docs/knowledge/hardware-constraints/FREE_PATH_REPLICAS.md`
 3. Read Colab runbook: `docs/runbooks/COLAB_KAGGLE.md` (vLLM **0.26.0** `+cu129`)
-4. Wire gateway → two OpenAI-compatible vLLM endpoints (`configs/models/workers.yaml`)
-5. Replay **high_reuse** (and RR vs prefix_aware at minimum) through the live harness:
+4. **Pin git tip ≥ `517a309`** on Colab; gate: `run_routing_matrix.py --help` must show `--worker-mode`
+5. Wire gateway → two OpenAI-compatible vLLM endpoints (`configs/models/workers.yaml`)
+6. Replay **high_reuse** (and RR vs prefix_aware at minimum) through the live harness:
    ```powershell
    uv run python benchmarks/run_routing_matrix.py --worker-mode live `
      --patterns high_reuse --strategies round_robin,prefix_aware --n 24 `
      --hardware colab-t4 --vllm-version 0.26.0 --replica-mode time_sliced_dual
    ```
-6. Write `results/phase5-live/` CSV + `SURPRISE_GPU.md`
-7. Tick ACs in ACCEPTANCE.md
+7. Confirm print path is `results/phase5-live/routing_matrix_live.csv` and rows say `worker_mode=live` (else STOP — still on old tip)
+8. Write `SURPRISE_GPU.md` + update claim inventory
+9. Tick ACs in ACCEPTANCE.md
 
 ## Non-negotiable
 
