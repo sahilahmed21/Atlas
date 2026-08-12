@@ -61,7 +61,7 @@ Command used flags for live mode, but binary was pre-harness → wrote:
 
 Sim headline (cite only as Phase 5): high_reuse prefix_aware p50 **297.5** vs RR **147.5**, hit **95.83%**, skew **1.0**. Full table matches prior `results/phase5/` / notebook output — do **not** put in `SURPRISE_GPU.md` as GPU TTFT.
 
-## AC status after this session
+## AC status after first Colab attempt (pre-live tip)
 
 | AC | Status |
 | --- | --- |
@@ -72,10 +72,21 @@ Sim headline (cite only as Phase 5): high_reuse prefix_aware p50 **297.5** vs RR
 | AC-005 claim inventory | Infra note only; no GPU TTFT claims |
 | AC-006 no APC/DistServe overclaim | Enforced — sim numbers not rebranded as GPU |
 
-## Next Colab steps (only)
+## Live matrix closed (same day, tip ≥ `517a309`)
 
-1. Ensure remote has ≥ `517a309` (push from laptop if needed).
-2. Pull/checkout that tip; gate on `--help` showing `--worker-mode`.
-3. Reconfirm 8001/8002 health.
-4. Run live harness → `results/phase5-live/routing_matrix_live.csv`.
-5. Download CSV; write `SURPRISE_GPU.md`; update claim inventory; tick ACs.
+`results/phase5-live/routing_matrix_live.csv`:
+
+| strategy | TTFT p50 | TTFT p95 | hit% | skew | mode |
+| --- | ---: | ---: | ---: | ---: | --- |
+| round_robin | 28.557 | 36.400 | 0 | 0.5 | live |
+| prefix_aware | 33.320 | 44.787 | 95.83 | 1.0 | live |
+
+**Verdict:** **WEAKENED** — affinity/skew match sim; ~2× TTFT cliff does not. See `SURPRISE_GPU.md`.
+
+| AC | Final |
+| --- | --- |
+| AC-001–006 | **PASS** — Phase 7 **Done**; Phase 8 may start |
+
+## Next
+
+Phase 8 TTFT / load gate (`docs/phases/phase-8/`).

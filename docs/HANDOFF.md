@@ -1,11 +1,10 @@
 # Atlas session handoff
 
-**Date:** 2026-08-12 (Phase 7: dual-vLLM infra PASS on Colab; live matrix still pending)  
-**Branch:** `master` (local **ahead of origin** — live harness commits not on GitHub until push)  
-**Runtime tip (platform):** `ea84aa0` — Phase 5.5 dashboard  
-**Harness tip (Phase 7 live CLI):** `517a309` / docs `b4305ee`  
-**Next:** Push ≥ `517a309` → Colab pull → re-run live matrix → `SURPRISE_GPU.md`  
-**Start:** `docs/phases/phase-7/START_HERE.md` · **Log:** `docs/phases/phase-7/RUN_LOG.md` · Notebook: `docs/runbooks/atlasP5live.ipynb`  
+**Date:** 2026-08-12 (**Phase 7 Done** — live WEAKENED verdict)  
+**Branch:** `master`  
+**Harness tip:** `517a309`+ · Live CSV + `SURPRISE_GPU.md` under `results/phase5-live/`  
+**Next phase:** **Phase 8** — TTFT / load gate  
+**Start:** `docs/phases/phase-8/README.md` · Arc: `docs/phases/NEXT_ARC.md`  
 **Repo:** `C:/projects/Atlas`
 
 Paste this file (or `@docs/HANDOFF.md`) into a new chat to resume without rediscovery.
@@ -33,7 +32,7 @@ Framing: `docs/framing/ONE_SENTENCE.md` · Root: `README.md` · Pitch: `docs/pit
 | 0–6 | **Done** | See prior handoffs / pitch |
 | 5 | **Done (sim)** | `results/phase5/` + SURPRISE |
 | 5.5 | **Done (UI)** | `/dashboard/` — video → Phase 9 |
-| 7 | **In progress** | Infra PASS; **no** live CSV yet |
+| 7 | **Done** | Live CSV + SURPRISE_GPU (**WEAKENED**) |
 | 8–10 | Planned | After Phase 7 ACs |
 
 **Phase 7 code:** live harness on laptop (`517a309`). **Phase 7 GPU matrix:** not landed.

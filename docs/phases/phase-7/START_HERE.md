@@ -1,6 +1,6 @@
 # Phase 7 — START HERE (live GPU routing validation)
 
-**Status:** In progress — infra PASS; live CSV pending (see [RUN_LOG.md](RUN_LOG.md))  
+**Status:** **Done** — see [SURPRISE_GPU.md](../../../results/phase5-live/SURPRISE_GPU.md) (WEAKENED) · [RUN_LOG.md](RUN_LOG.md)  
 **Hardware:** Colab/Kaggle T4 — **time-sliced dual vLLM** (or sequential isolated runs if dual concurrent OOM)  
 **Eye-stopper:** GPU-backed high_reuse cell in `results/phase5-live/`
 
