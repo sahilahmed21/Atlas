@@ -2,7 +2,8 @@
 
 | File | Role |
 | --- | --- |
-| `gate_matrix.csv` | RR / sticky prefix / prefix+gate on high_reuse |
-| `BEFORE_AFTER.md` | Three-way table + verdict |
+| `gate_matrix.csv` | RR / sticky / gated — **sim** |
+| `gate_matrix_live.csv` | Same three-way — **live** Colab T4 |
+| `BEFORE_AFTER.md` | Sim + live tables + verdicts |
 
-Sim cell (required) landed 2026-08-12. Live optional.
+Sim required AC landed 2026-08-12. Live confirm 2026-08-13: gate mechanics yes; TTFT benefit vs sticky **not** shown on that run.

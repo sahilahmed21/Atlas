@@ -1,0 +1,4 @@
+pattern,strategy,n,ttft_p50_ms,ttft_p95_ms,tokens_per_s_mean,cache_hit_pct,hit_broken_pct,worker_skew,worker_counts,worker_mode,load_margin,hardware,vllm_version,replica_mode,model
+high_reuse,round_robin,24,35.857,44.626,0.0,0.0,0.0,0.5,"{'worker-a': 12, 'worker-b': 12}",live,0,colab-t4,0.26.0,time_sliced_dual,Qwen/Qwen2.5-0.5B-Instruct
+high_reuse,prefix_aware,24,26.441,32.3,0.0,95.83,0.0,1.0,{'worker-a': 24},live,0,colab-t4,0.26.0,time_sliced_dual,Qwen/Qwen2.5-0.5B-Instruct
+high_reuse,prefix_aware,24,33.174,49.017,0.0,45.83,50.0,0.5,"{'worker-a': 12, 'worker-b': 12}",live,1,colab-t4,0.26.0,time_sliced_dual,Qwen/Qwen2.5-0.5B-Instruct

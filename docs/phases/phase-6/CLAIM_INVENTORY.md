@@ -15,7 +15,8 @@ Gate for pitch / README / resume. Every public number must appear here as **allo
 | Phase 5.5: live `/dashboard/` + `/atlas/events` from same `observe_request` path as Prometheus | `dashboard/`, `platform/observability/`, `docs/phases/phase-5.5/DEMO.md` | Process-local event ring; no prompt text; **video not recorded** |
 | Phase 7 live high_reuse on Colab T4 dual vLLM 0.26.0 (`time_sliced_dual`): RR TTFT p50 **28.557** / p95 **36.400**; prefix_aware p50 **33.320** / p95 **44.787**, hit% **95.83**, skew **1.0** (~1.17× p50 vs RR) | `results/phase5-live/routing_matrix_live.csv`, `SURPRISE_GPU.md` | Streaming TTFT; router hit ≠ vLLM APC; **WEAKENS** sim’s ~2× cliff |
 | Phase 7 verdict: sim magnitude **weakened**; affinity/skew pattern **preserved** | `SURPRISE_GPU.md` | Do not say “confirmed 2× GPU penalty” |
-| Phase 8 sim high_reuse: sticky prefix p50 **297.5** → gated prefix p50 **147.5** (= RR); skew 1.0 → 0.5; `hit_broken` **50%** at margin=1 | `results/phase8/gate_matrix.csv`, `BEFORE_AFTER.md` | Soft served pressure + in-flight; **heuristic ≠ llm-d EPP**; live optional |
+| Phase 8 sim high_reuse: sticky prefix p50 **297.5** → gated prefix p50 **147.5** (= RR); skew 1.0 → 0.5; `hit_broken` **50%** at margin=1 | `results/phase8/gate_matrix.csv`, `BEFORE_AFTER.md` | Soft served pressure + in-flight; **heuristic ≠ llm-d EPP** |
+| Phase 8 live high_reuse (T4 dual vLLM): gate fires (`hit_broken` **50%**, skew **0.5**); sticky p50 **26.441** beat gated **33.174** and RR **35.857** on this run | `results/phase8/gate_matrix_live.csv`, `BEFORE_AFTER.md` | Mechanics yes; **TTFT win vs sticky not shown** live; streaming TTFT |
 
 ## Forbidden
 
@@ -27,6 +28,7 @@ Gate for pitch / README / resume. Every public number must appear here as **allo
 | Live router hit% as “vLLM APC hit rate” | Atlas `cache_signal` only |
 | “Prefix-aware is 2× worse on GPU” | Live shows ~1.17× p50 — sim magnitude weakened |
 | “Atlas load gate = llm-d EPP / production TTFT predictor” | Heuristic served+in-flight margin only |
+| “Gate always improves live TTFT” | Live `gate_matrix_live.csv`: sticky beat gated on this T4 run |
 | Generic “prefix-aware improved X%” | Headline cells are sticky *loss* (small live, large sim) |
 | Empty demo video URL | Honesty: omit until a real recording exists |
 | Mixing Phase 1 torch peak with Phase 3 NVML as one meter | Different meters |

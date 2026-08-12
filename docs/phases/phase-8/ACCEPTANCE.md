@@ -1,8 +1,9 @@
 # Acceptance Brief: Phase 8 TTFT / load gate
 
-**Status:** **Done** (sim required ACs) — live Colab gate matrix optional  
-**Revision:** 2  
-**Artifacts:** `results/phase8/gate_matrix.csv` · `BEFORE_AFTER.md`
+**Status:** **Done** — sim required + live confirm recorded (mechanics yes; live TTFT win vs sticky **not** shown)  
+**Revision:** 3  
+**Artifacts:** `gate_matrix.csv` · `gate_matrix_live.csv` · `BEFORE_AFTER.md`
+
 
 ## Goal
 
