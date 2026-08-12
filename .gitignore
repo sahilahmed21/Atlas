@@ -1,5 +1,6 @@
 .venv/
 .venv-wsl/
+.venv-test/
 uv.toml.local
 __pycache__/
 *.py[cod]

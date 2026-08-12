@@ -61,10 +61,34 @@ def test_matrix_runner_writes_csv_for_one_pattern(tmp_path: Path):
     for row in rows:
         assert row["worker_mode"] == "simulated"
         assert row["pattern"] == "high_reuse"
+        assert row["load_margin"] == 0
         assert "ttft_p50_ms" in row
         assert "cache_hit_pct" in row
         text = out.read_text(encoding="utf-8")
         assert row["strategy"] in text
+
+
+def test_phase8_gate_matrix_three_way(tmp_path: Path):
+    from run_routing_matrix import run_matrix
+
+    out = tmp_path / "gate_matrix.csv"
+    rows = run_matrix(
+        patterns=["high_reuse"],
+        strategy_margins=[
+            ("round_robin", 0),
+            ("prefix_aware", 0),
+            ("prefix_aware", 1),
+        ],
+        n=8,
+        out_csv=out,
+    )
+    assert len(rows) == 3
+    sticky = rows[1]
+    gated = rows[2]
+    assert sticky["load_margin"] == 0
+    assert gated["load_margin"] == 1
+    assert sticky["worker_skew"] >= gated["worker_skew"]
+    assert gated["ttft_p50_ms"] <= sticky["ttft_p50_ms"]
 
 
 def _mock_live_factory(base_url: str):

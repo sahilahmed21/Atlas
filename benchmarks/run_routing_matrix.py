@@ -28,6 +28,7 @@ from traffic import MODEL, build_trace
 
 DEFAULT_OUT = ROOT / "results" / "phase5" / "routing_matrix.csv"
 DEFAULT_LIVE_OUT = ROOT / "results" / "phase5-live" / "routing_matrix_live.csv"
+DEFAULT_PHASE8_OUT = ROOT / "results" / "phase8" / "gate_matrix.csv"
 AUTH = "Bearer sk-atlas-demo-key"
 STRATEGIES = ("round_robin", "least_load", "prefix_aware")
 PATTERNS = ("high_reuse", "low_reuse", "bursty", "steady")
@@ -43,9 +44,11 @@ SIM_FIELDNAMES = [
     "ttft_p95_ms",
     "tokens_per_s_mean",
     "cache_hit_pct",
+    "hit_broken_pct",
     "worker_skew",
     "worker_counts",
     "worker_mode",
+    "load_margin",
 ]
 LIVE_FIELDNAMES = [
     "pattern",
@@ -55,9 +58,11 @@ LIVE_FIELDNAMES = [
     "ttft_p95_ms",
     "tokens_per_s_mean",
     "cache_hit_pct",
+    "hit_broken_pct",
     "worker_skew",
     "worker_counts",
     "worker_mode",
+    "load_margin",
     "hardware",
     "vllm_version",
     "replica_mode",
@@ -121,11 +126,12 @@ def _run_cell(
     hardware: str = "",
     vllm_version: str = "",
     replica_mode: str = "",
+    load_margin: int = 0,
 ) -> dict[str, Any]:
     from app import create_app
     from openai_worker_client import OpenAIWorkerClient
 
-    cell_dir = tmp / f"{strategy}_{pattern}"
+    cell_dir = tmp / f"{strategy}_{pattern}_m{load_margin}"
     cell_dir.mkdir(parents=True, exist_ok=True)
     if worker_mode == "live":
         tenants, workers_path, url_to_id = _write_configs(
@@ -158,6 +164,7 @@ def _run_cell(
         worker_client_factory=factory,
         loads=loads,
         prefix_owners={},
+        load_margin=load_margin,
     )
     client = TestClient(app)
     trace = build_trace(pattern, n)
@@ -165,6 +172,7 @@ def _run_cell(
     ttfts: list[float] = []
     tokens: list[float] = []
     hits = 0
+    broken = 0
     cache_n = 0
     worker_counts: dict[str, int] = {}
 
@@ -200,10 +208,12 @@ def _run_cell(
             signal = res.headers.get("x-atlas-cache-signal", "n/a")
 
         worker_counts[wid] = worker_counts.get(wid, 0) + 1
-        if signal in {"hit", "miss"}:
+        if signal in {"hit", "miss", "hit_broken"}:
             cache_n += 1
             if signal == "hit":
                 hits += 1
+            if signal == "hit_broken":
+                broken += 1
 
         if worker_mode == "live":
             upstream = None
@@ -235,9 +245,11 @@ def _run_cell(
         "ttft_p95_ms": round(_percentile(ttfts_sorted, 0.95), 3),
         "tokens_per_s_mean": round(statistics.mean(tokens), 3) if tokens else 0.0,
         "cache_hit_pct": round(100.0 * hits / cache_n, 2) if cache_n else 0.0,
+        "hit_broken_pct": round(100.0 * broken / cache_n, 2) if cache_n else 0.0,
         "worker_skew": round(skew, 3),
         "worker_counts": dict(sorted(worker_counts.items())),
         "worker_mode": worker_mode,
+        "load_margin": load_margin,
     }
     if worker_mode == "live":
         row["hardware"] = hardware
@@ -260,6 +272,8 @@ def run_matrix(
     hardware: str = "colab-t4",
     vllm_version: str = "0.26.0",
     replica_mode: str = "time_sliced_dual",
+    load_margin: int = 0,
+    strategy_margins: list[tuple[str, int]] | None = None,
 ) -> list[dict[str, Any]]:
     import tempfile
 
@@ -267,7 +281,9 @@ def run_matrix(
         raise ValueError(f"unknown worker_mode: {worker_mode}")
 
     patterns = list(patterns or PATTERNS)
-    strategies = list(strategies or STRATEGIES)
+    if strategy_margins is None:
+        strategies = list(strategies or STRATEGIES)
+        strategy_margins = [(s, load_margin) for s in strategies]
     if out_csv is None:
         out_csv = DEFAULT_LIVE_OUT if worker_mode == "live" else DEFAULT_OUT
     out_csv = Path(out_csv)
@@ -278,7 +294,7 @@ def run_matrix(
         for pattern in patterns:
             frozen = build_trace(pattern, n)
             assert len(frozen) == n
-            for strategy in strategies:
+            for strategy, margin in strategy_margins:
                 rows.append(
                     _run_cell(
                         strategy=strategy,
@@ -291,6 +307,7 @@ def run_matrix(
                         hardware=hardware,
                         vllm_version=vllm_version,
                         replica_mode=replica_mode,
+                        load_margin=margin,
                     )
                 )
         return rows
@@ -328,44 +345,72 @@ def main() -> None:
     parser.add_argument("--replica-mode", default="time_sliced_dual")
     parser.add_argument("--worker-a-url", default=DEFAULT_LIVE_URLS[0])
     parser.add_argument("--worker-b-url", default=DEFAULT_LIVE_URLS[1])
+    parser.add_argument(
+        "--load-margin",
+        type=int,
+        default=0,
+        help="prefix load gate margin; 0=off (Phase 5/7 sticky repro)",
+    )
+    parser.add_argument(
+        "--phase8",
+        action="store_true",
+        help="high_reuse × RR / prefix / prefix+gate → results/phase8/gate_matrix.csv",
+    )
     args = parser.parse_args()
 
-    patterns = (
-        [p.strip() for p in args.patterns.split(",") if p.strip()]
-        if args.patterns
-        else (["high_reuse"] if args.worker_mode == "live" else None)
-    )
-    strategies = (
-        [s.strip() for s in args.strategies.split(",") if s.strip()]
-        if args.strategies
-        else (
-            ["round_robin", "prefix_aware"]
-            if args.worker_mode == "live"
-            else None
+    if args.phase8:
+        patterns = ["high_reuse"]
+        gate_m = args.load_margin if args.load_margin > 0 else 1
+        strategy_margins = [
+            ("round_robin", 0),
+            ("prefix_aware", 0),
+            ("prefix_aware", gate_m),
+        ]
+        out = args.out or DEFAULT_PHASE8_OUT
+    else:
+        patterns = (
+            [p.strip() for p in args.patterns.split(",") if p.strip()]
+            if args.patterns
+            else (["high_reuse"] if args.worker_mode == "live" else None)
         )
-    )
+        strategies = (
+            [s.strip() for s in args.strategies.split(",") if s.strip()]
+            if args.strategies
+            else (
+                ["round_robin", "prefix_aware"]
+                if args.worker_mode == "live"
+                else None
+            )
+        )
+        strategy_margins = (
+            [(s, args.load_margin) for s in strategies] if strategies else None
+        )
+        out = args.out
 
     rows = run_matrix(
         patterns=patterns,
-        strategies=strategies,
+        strategy_margins=strategy_margins,
         n=args.n,
-        out_csv=args.out,
+        out_csv=out,
         worker_mode=args.worker_mode,
         worker_urls=(args.worker_a_url, args.worker_b_url),
         hardware=args.hardware,
         vllm_version=args.vllm_version,
         replica_mode=args.replica_mode,
+        load_margin=args.load_margin,
     )
-    out = args.out or (
-        DEFAULT_LIVE_OUT if args.worker_mode == "live" else DEFAULT_OUT
+    written = out or (
+        DEFAULT_PHASE8_OUT
+        if args.phase8
+        else (DEFAULT_LIVE_OUT if args.worker_mode == "live" else DEFAULT_OUT)
     )
-    print(f"wrote {out} ({len(rows)} rows)")
+    print(f"wrote {written} ({len(rows)} rows)")
     for row in rows:
         print(
-            f"{row['pattern']:12} {row['strategy']:13} "
+            f"{row['pattern']:12} {row['strategy']:13} m={row['load_margin']} "
             f"p50={row['ttft_p50_ms']} p95={row['ttft_p95_ms']} "
-            f"hit%={row['cache_hit_pct']} skew={row['worker_skew']} "
-            f"mode={row['worker_mode']}"
+            f"hit%={row['cache_hit_pct']} broken%={row['hit_broken_pct']} "
+            f"skew={row['worker_skew']} mode={row['worker_mode']}"
         )
 
 

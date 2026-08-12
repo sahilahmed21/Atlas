@@ -89,6 +89,10 @@ class LeastLoadRouter:
 
 
 class PrefixAwareRouter:
+    def __init__(self, load_margin: int = 0) -> None:
+        # ponytail: margin 0 = gate off (Phase 5/7 sticky repro); set >=1 for Phase 8
+        self.load_margin = max(0, int(load_margin))
+
     def choose(
         self,
         workers: Sequence[Any],
@@ -105,6 +109,21 @@ class PrefixAwareRouter:
         owner = owners.get(key)
         by_id = {w.id: w for w in workers}
         if owner and owner in by_id:
+            if self.load_margin > 0:
+                owner_load = loads.get(owner, 0)
+                alt = _least_load_worker(workers, loads)
+                alt_load = loads.get(alt.id, 0)
+                if owner_load >= alt_load + self.load_margin and alt.id != owner:
+                    return RouteDecision(
+                        worker_id=alt.id,
+                        strategy="prefix_aware",
+                        reason=(
+                            f"prefix hit broken by load_gate "
+                            f"load={owner_load} vs alt={alt_load} "
+                            f"margin={self.load_margin} ->{alt.id}"
+                        ),
+                        cache_signal="hit_broken",
+                    )
             return RouteDecision(
                 worker_id=owner,
                 strategy="prefix_aware",
@@ -120,11 +139,11 @@ class PrefixAwareRouter:
         )
 
 
-def build_router(strategy: str):
+def build_router(strategy: str, load_margin: int = 0):
     if strategy == "round_robin":
         return RoundRobinRouter()
     if strategy == "least_load":
         return LeastLoadRouter()
     if strategy == "prefix_aware":
-        return PrefixAwareRouter()
+        return PrefixAwareRouter(load_margin=load_margin)
     raise ValueError(f"unknown strategy: {strategy}")

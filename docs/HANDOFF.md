@@ -1,10 +1,10 @@
 # Atlas session handoff
 
-**Date:** 2026-08-12 (**Phase 7 Done** — live WEAKENED verdict)  
+**Date:** 2026-08-12 (**Phase 7–8 Done** — live WEAKENED + sim load gate)  
 **Branch:** `master`  
-**Harness tip:** `517a309`+ · Live CSV + `SURPRISE_GPU.md` under `results/phase5-live/`  
-**Next phase:** **Phase 8** — TTFT / load gate  
-**Start:** `docs/phases/phase-8/README.md` · Arc: `docs/phases/NEXT_ARC.md`  
+**Phase 8 tip:** pending commit · gate + `results/phase8/`  
+**Next phase:** **Phase 9** — shock package (demo + public README)  
+**Start:** `docs/phases/phase-9/README.md` · Arc: `docs/phases/NEXT_ARC.md`  
 **Repo:** `C:/projects/Atlas`
 
 Paste this file (or `@docs/HANDOFF.md`) into a new chat to resume without rediscovery.
@@ -13,98 +13,100 @@ Paste this file (or `@docs/HANDOFF.md`) into a new chat to resume without redisc
 
 ## 1. What Atlas is
 
-Research/systems project: demonstrate **production-grade multi-tenant LLM serving behavior** (OpenAI-compatible API, cache-aware routing, real metrics) on **constrained free-path hardware only** (laptop RTX 3050 4GB + Colab/Kaggle T4).
+Research/systems project: demonstrate **production-grade multi-tenant LLM serving behavior** on **constrained free-path hardware only** (laptop RTX 3050 4GB + Colab/Kaggle T4).
 
-**Not:** “I deployed vLLM on Kubernetes” or faked multi-node / RDMA.
+**Not:** multi-node / RDMA / DistServe as implemented.
 
-**Constraint (non-negotiable):** multi-replica = time-sliced processes or sequential runs; disaggregation is **informed future work**, not faked.
+**Career framing:** Phases 0–8 done on free path (Phase 8 sim gate closed). Hire-signal spike needs Phase 9 (demo/public). Phase 7 **weakens** the dramatic sim story; Phase 8 shows the industry-shaped fix recovers sim sticky TTFT.
 
-**Career framing:** Phases 0–6 = free-path MVP. Phases 7–9 = hire-signal arc. Do not market as 30 LPA outshiner until Phase 7 + 9 artifacts exist.
-
-Framing: `docs/framing/ONE_SENTENCE.md` · Root: `README.md` · Pitch: `docs/pitch/ONE_PARAGRAPH.md` · Deep dive: `docs/architecture/PROJECT_DEEP_DIVE.md`
+Framing: `docs/framing/ONE_SENTENCE.md` · Pitch: `docs/pitch/ONE_PARAGRAPH.md` · Deep dive: `docs/architecture/PROJECT_DEEP_DIVE.md`
 
 ---
 
 ## 2. Progress snapshot
 
-| Phase | Status | Eye-stopper / artifact |
+| Phase | Status | Eye-stopper |
 | --- | --- | --- |
-| 0–6 | **Done** | See prior handoffs / pitch |
-| 5 | **Done (sim)** | `results/phase5/` + SURPRISE |
+| 0–6 | **Done** | Pitch + inventory + platform |
+| 5 | **Done (sim)** | ~2× sticky loss (simulated) |
 | 5.5 | **Done (UI)** | `/dashboard/` — video → Phase 9 |
-| 7 | **Done** | Live CSV + SURPRISE_GPU (**WEAKENED**) |
-| 8–10 | Planned | After Phase 7 ACs |
-
-**Phase 7 code:** live harness on laptop (`517a309`). **Phase 7 GPU matrix:** not landed.
+| **7** | **Done (live)** | Dual vLLM T4; WEAKENED ~1.17× p50 |
+| **8** | **Done (sim)** | Gate: sticky 297.5 → gated 147.5 p50 |
+| 9 | **Do next** | Demo + public package |
+| 10 | Optional | One JD widener after 9 |
 
 ---
 
-## 3. What this session accomplished
+## 3. What Phase 7 achieved
 
-### Laptop (earlier)
-- Live harness TDD: RED `d8ed511` → GREEN `517a309` → docs `b4305ee`
-- `uv run pytest platform workers benchmarks -q` → **53 passed**
+- Dual **time_sliced_dual** vLLM **0.26.0** on Colab T4 behind Atlas gateway (`worker_mode=live`)
+- high_reuse × RR vs prefix_aware, **n=24**
+- Affinity works: hit% **95.83**, skew **1.0** (same pattern as sim)
+- Sticky still slower: p50 **33.32** vs RR **28.56** (~**1.17×**); p95 ~**1.23×** — **not** sim’s ~2×
+- Verdict **WEAKENED**; claim inventory + ACCEPTANCE AC-001–006 closed
+- Early bad Colab run (sim CSV into `results/phase5/`) explicitly **forbidden** as Phase 7 evidence
 
-### Colab (atlasP5live.ipynb) — recorded in RUN_LOG
-- T4 + vLLM **0.26.0** pin OK; torch 2.11.0+cu128
-- Dual workers :8001 + :8002, util 0.4, Qwen2.5-0.5B — models + inference **PASS**
-- Matrix cell used **old clone** (`origin` ≈ `0c871bf`) → CLI flags ignored → **sim** 12-row CSV under `results/phase5/`
-- **Not** valid Phase 7 evidence; `phase5-live/` still empty of CSV
-
-### Explicit non-claims
-- Do not cite 147.5 / 297.5 / 95.83% as GPU TTFT from this Colab session
-- Do not invent live numbers
+Tests last known: `uv run pytest platform workers benchmarks -q` → **53 passed**
 
 ---
 
 ## 4. Key measured findings (cite these; don’t invent)
 
-### Phase 5 — offline simulated (unchanged)
+### Phase 1 — 3050 HF
+N=8 p50 **9242 ms** ≈ **5.5×** N=1 — `results/phase1/`
 
-| Cell | Finding |
-| --- | --- |
-| high_reuse × prefix_aware | hit% 95.83; skew 1.0; TTFT p50 **297.5** vs RR **147.5** |
+### Phase 3 — T4 vLLM
+Batch wall ~210–266 ms; overlay **cross-hardware** — `results/phase3/`
 
-**Do not cite as GPU TTFT.**
+### Phase 5 — sim only
+high_reuse prefix p50 **297.5** vs RR **147.5** (~2×) — **not GPU TTFT**
 
-### Phase 7 — infra only (2026-08-12)
+### Phase 7 — live streaming TTFT (Colab T4, dual vLLM)
 
-Dual time-sliced vLLM on one T4 serves chat on 8001 and 8002. No live routing TTFT matrix yet.
+| Metric | round_robin | prefix_aware |
+| --- | ---: | ---: |
+| TTFT p50 (ms) | **28.557** | 33.320 (~1.17×) |
+| TTFT p95 (ms) | **36.400** | 44.787 (~1.23×) |
+| cache hit % | 0 | **95.83** |
+| skew | 0.5 | **1.0** |
+
+Data: `results/phase5-live/` · **WEAKENED** vs sim magnitude.
 
 ---
 
 ## 5. Honesty rules (do not regress)
 
-Prior rules 1–14 still apply. Add:
+Prior 1–14 plus:
 
-15. Colab run on tip **without** `--worker-mode` support is **sim**, even if dual vLLM is up.
-16. Gate: `run_routing_matrix.py --help | grep worker-mode` before claiming live.
-
----
-
-## 6. What to do next — finish Phase 7
-
-1. **Push** local commits ≥ `517a309` to GitHub (Colab clones origin).
-2. Colab: `git pull` / checkout; confirm `--help` shows `--worker-mode`.
-3. Reconfirm 8001/8002 health.
-4. Run live harness → `results/phase5-live/routing_matrix_live.csv` with `worker_mode=live`.
-5. Write `SURPRISE_GPU.md`; update claim inventory; tick AC-002–006.
-
-Details: `docs/phases/phase-7/RUN_LOG.md`.
+15. Tip without `--worker-mode` → sim, even if dual vLLM is up.  
+16. Confirm `run_routing_matrix.py --help | grep worker-mode` before live claims.  
+17. Do **not** say “confirmed 2× GPU penalty” — say **WEAKENED** (~1.17×).  
+18. Phase 7 streaming TTFT ≠ Phase 3 batch wall.  
+19. Router `cache_signal` ≠ vLLM APC.
 
 ---
 
-## 7. Reproduce commands
+## 6. What to do next — Phase 8
+
+**Spec:** `docs/phases/phase-8/README.md` · `ACCEPTANCE.md`
+
+Ship minimal prefix-aware **load gate**; before/after table RR vs sticky vs gated on high_reuse (sim required; live preferred). Gate still motivated by live sticky penalty + production failure mode — **not** by a dramatic 2× GPU cliff.
+
+Then Phase 9 (demo citing WEAKENED honestly).
+
+---
+
+## 7. Reproduce
 
 ```powershell
 cd C:\projects\Atlas
 uv sync
 uv run pytest platform workers benchmarks -q
 
-# sim (Phase 5)
+# Phase 5 sim
 uv run python benchmarks/run_routing_matrix.py
 
-# live (Phase 7) — only after dual vLLM up AND tip ≥ 517a309
+# Phase 7 live (dual vLLM on :8001/:8002)
 uv run python benchmarks/run_routing_matrix.py --worker-mode live `
   --patterns high_reuse --strategies round_robin,prefix_aware --n 24 `
   --hardware colab-t4 --vllm-version 0.26.0 --replica-mode time_sliced_dual
@@ -112,33 +114,27 @@ uv run python benchmarks/run_routing_matrix.py --worker-mode live `
 
 ---
 
-## 8. Preferred working style
+## 8. Prompt starter
 
-Skills: **ponytail**, **karpathy-guidelines**, **tdd-workflow**, **intent-driven-development**.
+```text
+Continue Atlas from @docs/HANDOFF.md and @docs/phases/NEXT_ARC.md.
 
-- PowerShell: `git commit -m "message"` (no bash heredocs)
-- Docs-first honesty; no invented GPU metrics
-
----
-
-## 9. Known gaps / landmines
-
-| Gap | Detail |
-| --- | --- |
-| Live harness not on origin | Local ahead 3+; Colab will keep getting sim until push+pull |
-| No `routing_matrix_live.csv` | AC-002 open |
-| Sequential least_load skew | Still a sim/sequential artifact |
-| Phase 8–9 | After Phase 7 close |
+Phase 7 Done (WEAKENED): live dual-vLLM high_reuse — affinity works,
+~1.17× sticky p50 vs RR (not sim 2×). Artifacts in results/phase5-live/.
+Start Phase 8 per docs/phases/phase-8/README.md: TTFT/load gate +
+before/after matrix. Respect honesty; no DistServe; no “confirmed 2×”.
+```
 
 ---
 
-## 10. Quick links
+## 9. Quick links
 
 | Need | Path |
 | --- | --- |
-| Phase 7 run log | `docs/phases/phase-7/RUN_LOG.md` |
-| Phase 7 start / ACs | `START_HERE.md` · `ACCEPTANCE.md` |
-| Colab notebook | `docs/runbooks/atlasP5live.ipynb` |
-| Hire-signal arc | `docs/phases/NEXT_ARC.md` |
-| Phase 5 surprise (sim) | `results/phase5/SURPRISE.md` |
+| Live surprise | `results/phase5-live/SURPRISE_GPU.md` |
+| Live CSV | `results/phase5-live/routing_matrix_live.csv` |
+| Phase 7 ACs / RUN_LOG | `docs/phases/phase-7/` |
+| Phase 8 start | `docs/phases/phase-8/README.md` |
 | Claim inventory | `docs/phases/phase-6/CLAIM_INVENTORY.md` |
+| Hire-signal arc | `docs/phases/NEXT_ARC.md` |
+| Deep dive | `docs/architecture/PROJECT_DEEP_DIVE.md` |

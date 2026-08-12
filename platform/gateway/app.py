@@ -106,10 +106,12 @@ def create_app(
     loads: dict[str, int] | None = None,
     prefix_owners: dict[str, str] | None = None,
     metrics: AtlasMetrics | None = None,
+    load_margin: int = 0,
 ) -> FastAPI:
     tenants = load_tenants(tenants_path)
     workers = load_workers(workers_path)
-    router = build_router(strategy)
+    load_margin = max(0, int(load_margin))
+    router = build_router(strategy, load_margin=load_margin)
     factory = worker_client_factory or (
         lambda base_url: OpenAIWorkerClient(base_url=base_url)
     )
@@ -141,6 +143,23 @@ def create_app(
             # ponytail: no eviction; add LRU if unique-prefix map growth matters
             app.state.prefix_owners[prefix_key] = worker_id
 
+    def _route_loads() -> dict[str, int]:
+        """In-flight + optional soft served pressure when load gate is on."""
+        with route_lock:
+            out = dict(app.state.loads)
+            if load_margin > 0:
+                for wid, n in app.state.served_counts.items():
+                    out[wid] = out.get(wid, 0) + int(n)
+            return out
+
+    def _served_inc(worker_id: str) -> None:
+        if load_margin <= 0:
+            return
+        with route_lock:
+            app.state.served_counts[worker_id] = (
+                app.state.served_counts.get(worker_id, 0) + 1
+            )
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         yield
@@ -161,6 +180,8 @@ def create_app(
     app.state.loads = loads or {}
     app.state.prefix_owners = prefix_owners or {}
     app.state.metrics = metrics
+    app.state.load_margin = load_margin
+    app.state.served_counts = {}
 
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(request: Request, exc: RequestValidationError):
@@ -259,11 +280,12 @@ def create_app(
             if isinstance(router, PrefixAwareRouter):
                 choose_kwargs["prefix_key"] = prefix_key
                 choose_kwargs["prefix_owners"] = app.state.prefix_owners
-                choose_kwargs["loads"] = app.state.loads
+                choose_kwargs["loads"] = _route_loads()
 
             decision = router.choose(eligible, **choose_kwargs)
             worker = next(w for w in eligible if w.id == decision.worker_id)
             _claim_prefix(prefix_key, worker.id, decision.cache_signal)
+            _served_inc(worker.id)
             _load_inc(worker.id)
             span.set_attribute("atlas.worker_id", worker.id)
             span.set_attribute("atlas.cache_signal", decision.cache_signal)
@@ -401,11 +423,17 @@ def create_app(
 
 
 def create_app_from_env() -> FastAPI:
-    """Uvicorn entry: ATLAS_TENANTS / ATLAS_WORKERS / ATLAS_STRATEGY."""
+    """Uvicorn entry: ATLAS_TENANTS / ATLAS_WORKERS / ATLAS_STRATEGY / ATLAS_PREFIX_LOAD_MARGIN."""
     import os
 
     root = Path(__file__).resolve().parents[2]
     tenants = os.environ.get("ATLAS_TENANTS", str(root / "configs/tenants/example.yaml"))
     workers = os.environ.get("ATLAS_WORKERS", str(root / "configs/models/workers.yaml"))
     strategy = os.environ.get("ATLAS_STRATEGY", "round_robin")
-    return create_app(tenants_path=tenants, workers_path=workers, strategy=strategy)
+    margin = int(os.environ.get("ATLAS_PREFIX_LOAD_MARGIN", "0"))
+    return create_app(
+        tenants_path=tenants,
+        workers_path=workers,
+        strategy=strategy,
+        load_margin=margin,
+    )

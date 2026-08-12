@@ -1,0 +1,4 @@
+pattern,strategy,n,ttft_p50_ms,ttft_p95_ms,tokens_per_s_mean,cache_hit_pct,hit_broken_pct,worker_skew,worker_counts,worker_mode,load_margin
+high_reuse,round_robin,24,147.5,281.25,8.685,0.0,0.0,0.5,"{'worker-a': 12, 'worker-b': 12}",simulated,0
+high_reuse,prefix_aware,24,297.5,556.25,5.491,95.83,0.0,1.0,{'worker-a': 24},simulated,0
+high_reuse,prefix_aware,24,147.5,281.25,8.685,45.83,50.0,0.5,"{'worker-a': 12, 'worker-b': 12}",simulated,1

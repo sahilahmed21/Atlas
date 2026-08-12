@@ -78,7 +78,13 @@ class FakeWorkerClient:
         yield "data: [DONE]\n\n"
 
 
-def _app(tmp_path: Path, strategy: str, fake: FakeWorkerClient | None = None):
+def _app(
+    tmp_path: Path,
+    strategy: str,
+    fake: FakeWorkerClient | None = None,
+    *,
+    load_margin: int = 0,
+):
     from app import create_app
 
     fake = fake or FakeWorkerClient()
@@ -87,6 +93,7 @@ def _app(tmp_path: Path, strategy: str, fake: FakeWorkerClient | None = None):
         workers_path=_workers_yaml(tmp_path / "workers.yaml"),
         strategy=strategy,
         worker_client_factory=lambda _url: fake,
+        load_margin=load_margin,
     )
     return app, fake
 
@@ -119,6 +126,24 @@ def test_prefix_aware_owner_writeback_and_hit(tmp_path: Path):
     assert r2.headers["x-atlas-cache-signal"] == "hit"
     assert r1.headers["x-atlas-worker-id"] == r2.headers["x-atlas-worker-id"]
     assert app.state.prefix_owners, "owner map must be claimed after miss"
+
+
+def test_prefix_aware_load_gate_breaks_sticky_under_served_pressure(tmp_path: Path):
+    """AC-004: with load_margin>0, soft served pressure breaks sticky to cooler worker."""
+    app, _fake = _app(tmp_path, "prefix_aware", load_margin=1)
+    client = TestClient(app)
+
+    r1 = _chat(client, "q1")
+    assert r1.status_code == 200
+    assert r1.headers["x-atlas-cache-signal"] == "miss"
+    owner = r1.headers["x-atlas-worker-id"]
+
+    r2 = _chat(client, "q2")
+    assert r2.status_code == 200
+    # served[owner]=1, alt=0, margin=1 → break on second request
+    assert r2.headers["x-atlas-cache-signal"] == "hit_broken"
+    assert r2.headers["x-atlas-worker-id"] != owner
+    assert "load_gate" in r2.headers["x-atlas-route-reason"].lower()
 
 
 def test_loads_return_to_zero_after_non_stream(tmp_path: Path):

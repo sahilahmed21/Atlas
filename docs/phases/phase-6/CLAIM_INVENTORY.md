@@ -15,6 +15,7 @@ Gate for pitch / README / resume. Every public number must appear here as **allo
 | Phase 5.5: live `/dashboard/` + `/atlas/events` from same `observe_request` path as Prometheus | `dashboard/`, `platform/observability/`, `docs/phases/phase-5.5/DEMO.md` | Process-local event ring; no prompt text; **video not recorded** |
 | Phase 7 live high_reuse on Colab T4 dual vLLM 0.26.0 (`time_sliced_dual`): RR TTFT p50 **28.557** / p95 **36.400**; prefix_aware p50 **33.320** / p95 **44.787**, hit% **95.83**, skew **1.0** (~1.17× p50 vs RR) | `results/phase5-live/routing_matrix_live.csv`, `SURPRISE_GPU.md` | Streaming TTFT; router hit ≠ vLLM APC; **WEAKENS** sim’s ~2× cliff |
 | Phase 7 verdict: sim magnitude **weakened**; affinity/skew pattern **preserved** | `SURPRISE_GPU.md` | Do not say “confirmed 2× GPU penalty” |
+| Phase 8 sim high_reuse: sticky prefix p50 **297.5** → gated prefix p50 **147.5** (= RR); skew 1.0 → 0.5; `hit_broken` **50%** at margin=1 | `results/phase8/gate_matrix.csv`, `BEFORE_AFTER.md` | Soft served pressure + in-flight; **heuristic ≠ llm-d EPP**; live optional |
 
 ## Forbidden
 
@@ -25,6 +26,7 @@ Gate for pitch / README / resume. Every public number must appear here as **allo
 | Early 2026-08-12 Colab matrix under `results/phase5/` as Phase 7 live evidence | Pre-`517a309` tip; `worker_mode=simulated` |
 | Live router hit% as “vLLM APC hit rate” | Atlas `cache_signal` only |
 | “Prefix-aware is 2× worse on GPU” | Live shows ~1.17× p50 — sim magnitude weakened |
+| “Atlas load gate = llm-d EPP / production TTFT predictor” | Heuristic served+in-flight margin only |
 | Generic “prefix-aware improved X%” | Headline cells are sticky *loss* (small live, large sim) |
 | Empty demo video URL | Honesty: omit until a real recording exists |
 | Mixing Phase 1 torch peak with Phase 3 NVML as one meter | Different meters |
@@ -39,8 +41,8 @@ Gate for pitch / README / resume. Every public number must appear here as **allo
 | --- | --- | --- |
 | Prefill/decode disaggregation | Needs multiple GPUs + fast interconnect; interference exists on one T4 but cannot be scheduled away by topology | `docs/research/distserve/ATLAS_RELEVANCE.md` |
 | Production llm-d / multi-node | Inspired by llm-d cache-aware concerns; not an llm-d deploy | `docs/research/llm-d/ATLAS_RELEVANCE.md` |
-| TTFT load gate on prefix-aware | Break stickiness when warm replica too hot — still useful after weakened live gap | **Phase 8** `docs/phases/phase-8/` |
-| Phase 5.5 90s video + public package | UI + runbook ready; cite WEAKENED live verdict honestly | **Phase 9** `docs/phases/phase-9/` · `docs/phases/phase-5.5/DEMO.md` |
+| Phase 8 live gate matrix | Optional Colab confirm of sim recovery | `docs/phases/phase-8/` |
+| Phase 5.5 90s video + public package | UI + runbook ready; cite WEAKENED live + gate honestly | **Phase 9** `docs/phases/phase-9/` · `docs/phases/phase-5.5/DEMO.md` |
 | Optional JD widener | One of RAG / eval / cost — only after Phase 9 | **Phase 10** `docs/phases/phase-10/` |
 | Optional fuller live matrix | least_load / low_reuse cells — not required for Phase 7 close | Phase 7 README |
 

@@ -110,3 +110,74 @@ def test_choose_raises_when_no_workers():
 
     with pytest.raises(ValueError, match="worker"):
         RoundRobinRouter().choose([])
+
+
+def test_prefix_aware_sticky_when_owner_cool():
+    """AC-001: owner load ≤ alternate + margin → hit owner."""
+    from strategies import PrefixAwareRouter
+
+    router = PrefixAwareRouter(load_margin=1)
+    workers = _workers()
+    owners = {"pkey": "worker-a"}
+    # 0 < 0+1 → sticky (break only when owner >= alt + margin)
+    loads = {"worker-a": 0, "worker-b": 0, "worker-c": 0}
+
+    decision = router.choose(
+        workers, prefix_key="pkey", prefix_owners=owners, loads=loads
+    )
+
+    assert decision.worker_id == "worker-a"
+    assert decision.cache_signal == "hit"
+    assert "hit" in decision.reason.lower()
+
+
+def test_prefix_aware_breaks_when_owner_hot():
+    """AC-002: owner load ≥ alternate + margin → cooler worker, hit_broken."""
+    from strategies import PrefixAwareRouter
+
+    router = PrefixAwareRouter(load_margin=1)
+    workers = _workers()
+    owners = {"pkey": "worker-a"}
+    loads = {"worker-a": 3, "worker-b": 0, "worker-c": 1}  # 3 >= 0+1 → break
+
+    decision = router.choose(
+        workers, prefix_key="pkey", prefix_owners=owners, loads=loads
+    )
+
+    assert decision.worker_id == "worker-b"
+    assert decision.cache_signal == "hit_broken"
+    assert "load_gate" in decision.reason.lower() or "gate" in decision.reason.lower()
+    assert decision.strategy == "prefix_aware"
+
+
+def test_prefix_aware_miss_unchanged_with_gate():
+    """AC-003: no owner → least_load miss even when gate configured."""
+    from strategies import PrefixAwareRouter
+
+    router = PrefixAwareRouter(load_margin=1)
+    workers = _workers()
+    loads = {"worker-a": 4, "worker-b": 0, "worker-c": 2}
+
+    decision = router.choose(
+        workers, prefix_key="abc123", prefix_owners={}, loads=loads
+    )
+
+    assert decision.worker_id == "worker-b"
+    assert decision.cache_signal == "miss"
+
+
+def test_prefix_aware_default_margin_zero_keeps_sticky_under_skew():
+    """AC-007: default gate off — hot owner still sticky (Phase 5/7 repro)."""
+    from strategies import PrefixAwareRouter
+
+    router = PrefixAwareRouter()  # load_margin default 0
+    workers = _workers()
+    owners = {"pkey": "worker-a"}
+    loads = {"worker-a": 99, "worker-b": 0}
+
+    decision = router.choose(
+        workers, prefix_key="pkey", prefix_owners=owners, loads=loads
+    )
+
+    assert decision.worker_id == "worker-a"
+    assert decision.cache_signal == "hit"

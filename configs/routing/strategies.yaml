@@ -1,5 +1,9 @@
-# Placeholder — Phase 4–5
+# Placeholder — Phase 4–5 + Phase 8 gate knob
 strategies:
   - round_robin
   - least_load
   - prefix_aware
+
+# Prefix load gate (Phase 8). Env wins at runtime: ATLAS_PREFIX_LOAD_MARGIN
+# 0 = off (default; Phase 5/7 sticky repro). 1+ = break sticky when owner hotter than alt.
+prefix_load_margin_default: 0
