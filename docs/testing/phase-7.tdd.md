@@ -19,9 +19,9 @@
 ### Task: GREEN (live mode + CLI)
 
 - **Command:** `uv run pytest benchmarks/test_routing_matrix_harness.py -q` → `3 passed`
-- **Full:** `uv run pytest platform workers benchmarks -q`
+- **Full:** `uv run pytest platform workers benchmarks -q` → `53 passed`
 - **Guaranteed:** `--worker-mode live` streams; MockTransport path records TTFT; CSV carries live metadata; sim path unchanged
-- **Checkpoint:** (GREEN commit after this report)
+- **Checkpoint:** `517a309` `feat: Phase 7 live routing matrix harness (GREEN)`
 
 ## Test specification
 
@@ -40,4 +40,4 @@ No coverage % tool. **Intentional gap:** real Colab dual-vLLM evidence (AC-001�
 | Commit | Stage |
 | --- | --- |
 | `d8ed511` test: Phase 7 live routing matrix harness reproducer (RED) | RED |
-| (next) feat: Phase 7 live routing matrix harness (GREEN) | GREEN |
+| `517a309` feat: Phase 7 live routing matrix harness (GREEN) | GREEN |
