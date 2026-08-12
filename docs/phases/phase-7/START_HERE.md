@@ -14,7 +14,12 @@ Phase 5 proved the surprise **offline** (`worker_mode=simulated`). Interviewers 
 2. Read free-path replica notes: `docs/knowledge/hardware-constraints/FREE_PATH_REPLICAS.md`
 3. Read Colab runbook: `docs/runbooks/COLAB_KAGGLE.md` (vLLM **0.26.0** `+cu129`)
 4. Wire gateway → two OpenAI-compatible vLLM endpoints (`configs/models/workers.yaml`)
-5. Replay **high_reuse** (and RR vs prefix_aware at minimum) through the real gateway
+5. Replay **high_reuse** (and RR vs prefix_aware at minimum) through the live harness:
+   ```powershell
+   uv run python benchmarks/run_routing_matrix.py --worker-mode live `
+     --patterns high_reuse --strategies round_robin,prefix_aware --n 24 `
+     --hardware colab-t4 --vllm-version 0.26.0 --replica-mode time_sliced_dual
+   ```
 6. Write `results/phase5-live/` CSV + `SURPRISE_GPU.md`
 7. Tick ACs in ACCEPTANCE.md
 

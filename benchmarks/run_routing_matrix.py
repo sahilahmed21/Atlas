@@ -1,12 +1,13 @@
-"""Replay frozen traffic traces across routing strategies; write Phase 5 CSV."""
+"""Replay frozen traffic traces across routing strategies; write Phase 5/7 CSV."""
 
 from __future__ import annotations
 
+import argparse
 import csv
 import statistics
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 ROOT = Path(__file__).resolve().parents[1]
 for _p in (
@@ -26,9 +27,42 @@ from fake_worker import SimulatedWorkerClient
 from traffic import MODEL, build_trace
 
 DEFAULT_OUT = ROOT / "results" / "phase5" / "routing_matrix.csv"
+DEFAULT_LIVE_OUT = ROOT / "results" / "phase5-live" / "routing_matrix_live.csv"
 AUTH = "Bearer sk-atlas-demo-key"
 STRATEGIES = ("round_robin", "least_load", "prefix_aware")
 PATTERNS = ("high_reuse", "low_reuse", "bursty", "steady")
+DEFAULT_LIVE_URLS = (
+    "http://127.0.0.1:8001/v1",
+    "http://127.0.0.1:8002/v1",
+)
+SIM_FIELDNAMES = [
+    "pattern",
+    "strategy",
+    "n",
+    "ttft_p50_ms",
+    "ttft_p95_ms",
+    "tokens_per_s_mean",
+    "cache_hit_pct",
+    "worker_skew",
+    "worker_counts",
+    "worker_mode",
+]
+LIVE_FIELDNAMES = [
+    "pattern",
+    "strategy",
+    "n",
+    "ttft_p50_ms",
+    "ttft_p95_ms",
+    "tokens_per_s_mean",
+    "cache_hit_pct",
+    "worker_skew",
+    "worker_counts",
+    "worker_mode",
+    "hardware",
+    "vllm_version",
+    "replica_mode",
+    "model",
+]
 
 
 def _percentile(sorted_vals: list[float], p: float) -> float:
@@ -44,7 +78,12 @@ def _percentile(sorted_vals: list[float], p: float) -> float:
     return sorted_vals[f] + (sorted_vals[c] - sorted_vals[f]) * (k - f)
 
 
-def _write_configs(tmp: Path) -> tuple[Path, Path, dict[str, str]]:
+def _write_configs(
+    tmp: Path,
+    *,
+    url_a: str = "http://sim-a/v1",
+    url_b: str = "http://sim-b/v1",
+) -> tuple[Path, Path, dict[str, str]]:
     tenants = tmp / "tenants.yaml"
     workers = tmp / "workers.yaml"
     tenants.write_text(
@@ -60,13 +99,13 @@ def _write_configs(tmp: Path) -> tuple[Path, Path, dict[str, str]]:
         "workers:\n"
         "  - id: worker-a\n"
         f"    model: {MODEL}\n"
-        "    base_url: http://sim-a/v1\n"
+        f"    base_url: {url_a}\n"
         "  - id: worker-b\n"
         f"    model: {MODEL}\n"
-        "    base_url: http://sim-b/v1\n",
+        f"    base_url: {url_b}\n",
         encoding="utf-8",
     )
-    url_to_id = {"http://sim-a/v1": "worker-a", "http://sim-b/v1": "worker-b"}
+    url_to_id = {url_a.rstrip("/"): "worker-a", url_b.rstrip("/"): "worker-b"}
     return tenants, workers, url_to_id
 
 
@@ -76,21 +115,41 @@ def _run_cell(
     pattern: str,
     n: int,
     tmp: Path,
+    worker_mode: str = "simulated",
+    worker_urls: tuple[str, str] = DEFAULT_LIVE_URLS,
+    worker_client_factory: Callable[[str], Any] | None = None,
+    hardware: str = "",
+    vllm_version: str = "",
+    replica_mode: str = "",
 ) -> dict[str, Any]:
     from app import create_app
+    from openai_worker_client import OpenAIWorkerClient
 
     cell_dir = tmp / f"{strategy}_{pattern}"
     cell_dir.mkdir(parents=True, exist_ok=True)
-    tenants, workers_path, url_to_id = _write_configs(cell_dir)
-    loads: dict[str, int] = {}
-    clients: dict[str, SimulatedWorkerClient] = {}
+    if worker_mode == "live":
+        tenants, workers_path, url_to_id = _write_configs(
+            cell_dir, url_a=worker_urls[0], url_b=worker_urls[1]
+        )
+    else:
+        tenants, workers_path, url_to_id = _write_configs(cell_dir)
 
-    def factory(base_url: str) -> SimulatedWorkerClient:
-        if base_url not in clients:
-            clients[base_url] = SimulatedWorkerClient(
-                url_to_id[base_url], loads=loads
-            )
-        return clients[base_url]
+    loads: dict[str, int] = {}
+    clients: dict[str, Any] = {}
+
+    def factory(base_url: str) -> Any:
+        key = base_url.rstrip("/")
+        if key not in clients:
+            if worker_mode == "live":
+                if worker_client_factory is not None:
+                    clients[key] = worker_client_factory(base_url)
+                else:
+                    clients[key] = OpenAIWorkerClient(base_url=base_url)
+            else:
+                clients[key] = SimulatedWorkerClient(
+                    url_to_id[key], loads=loads
+                )
+        return clients[key]
 
     app = create_app(
         tenants_path=tenants,
@@ -110,32 +169,65 @@ def _run_cell(
     worker_counts: dict[str, int] = {}
 
     for body in trace:
-        res = client.post(
-            "/v1/chat/completions",
-            headers={"Authorization": AUTH},
-            json=body,
-        )
-        if res.status_code != 200:
-            raise RuntimeError(
-                f"{strategy}/{pattern} status={res.status_code} {res.text}"
+        req = dict(body)
+        if worker_mode == "live":
+            req["stream"] = True
+            with client.stream(
+                "POST",
+                "/v1/chat/completions",
+                headers={"Authorization": AUTH},
+                json=req,
+            ) as res:
+                if res.status_code != 200:
+                    raise RuntimeError(
+                        f"{strategy}/{pattern} status={res.status_code} "
+                        f"{res.read().decode('utf-8', errors='replace')}"
+                    )
+                _ = "".join(res.iter_text())
+                wid = res.headers["x-atlas-worker-id"]
+                signal = res.headers.get("x-atlas-cache-signal", "n/a")
+        else:
+            res = client.post(
+                "/v1/chat/completions",
+                headers={"Authorization": AUTH},
+                json=req,
             )
-        wid = res.headers["x-atlas-worker-id"]
+            if res.status_code != 200:
+                raise RuntimeError(
+                    f"{strategy}/{pattern} status={res.status_code} {res.text}"
+                )
+            wid = res.headers["x-atlas-worker-id"]
+            signal = res.headers.get("x-atlas-cache-signal", "n/a")
+
         worker_counts[wid] = worker_counts.get(wid, 0) + 1
-        signal = res.headers.get("x-atlas-cache-signal", "n/a")
         if signal in {"hit", "miss"}:
             cache_n += 1
             if signal == "hit":
                 hits += 1
-        sim = next(c for c in clients.values() if c.worker_id == wid)
-        ttfts.append(float(sim.last_timings.get("ttft_ms") or 0.0))
-        tps = sim.last_timings.get("tokens_per_s")
-        if tps is not None:
-            tokens.append(float(tps))
+
+        if worker_mode == "live":
+            upstream = None
+            for url, c in clients.items():
+                if url_to_id.get(url.rstrip("/")) == wid:
+                    upstream = c
+                    break
+            if upstream is None:
+                raise RuntimeError(f"no client for worker {wid}")
+            ttfts.append(float(upstream.last_timings.get("ttft_ms") or 0.0))
+            tps = upstream.last_timings.get("tokens_per_s")
+            if tps is not None:
+                tokens.append(float(tps))
+        else:
+            sim = next(c for c in clients.values() if c.worker_id == wid)
+            ttfts.append(float(sim.last_timings.get("ttft_ms") or 0.0))
+            tps = sim.last_timings.get("tokens_per_s")
+            if tps is not None:
+                tokens.append(float(tps))
 
     ttfts_sorted = sorted(ttfts)
     total = sum(worker_counts.values()) or 1
     skew = max(worker_counts.values()) / total if worker_counts else 0.0
-    return {
+    row: dict[str, Any] = {
         "pattern": pattern,
         "strategy": strategy,
         "n": n,
@@ -145,8 +237,14 @@ def _run_cell(
         "cache_hit_pct": round(100.0 * hits / cache_n, 2) if cache_n else 0.0,
         "worker_skew": round(skew, 3),
         "worker_counts": dict(sorted(worker_counts.items())),
-        "worker_mode": "simulated",
+        "worker_mode": worker_mode,
     }
+    if worker_mode == "live":
+        row["hardware"] = hardware
+        row["vllm_version"] = vllm_version
+        row["replica_mode"] = replica_mode
+        row["model"] = MODEL
+    return row
 
 
 def run_matrix(
@@ -156,12 +254,23 @@ def run_matrix(
     n: int = 24,
     out_csv: Path | None = None,
     tmp: Path | None = None,
+    worker_mode: str = "simulated",
+    worker_urls: tuple[str, str] = DEFAULT_LIVE_URLS,
+    worker_client_factory: Callable[[str], Any] | None = None,
+    hardware: str = "colab-t4",
+    vllm_version: str = "0.26.0",
+    replica_mode: str = "time_sliced_dual",
 ) -> list[dict[str, Any]]:
     import tempfile
 
+    if worker_mode not in {"simulated", "live"}:
+        raise ValueError(f"unknown worker_mode: {worker_mode}")
+
     patterns = list(patterns or PATTERNS)
     strategies = list(strategies or STRATEGIES)
-    out_csv = Path(out_csv or DEFAULT_OUT)
+    if out_csv is None:
+        out_csv = DEFAULT_LIVE_OUT if worker_mode == "live" else DEFAULT_OUT
+    out_csv = Path(out_csv)
     out_csv.parent.mkdir(parents=True, exist_ok=True)
 
     def _execute(work: Path) -> list[dict[str, Any]]:
@@ -171,7 +280,18 @@ def run_matrix(
             assert len(frozen) == n
             for strategy in strategies:
                 rows.append(
-                    _run_cell(strategy=strategy, pattern=pattern, n=n, tmp=work)
+                    _run_cell(
+                        strategy=strategy,
+                        pattern=pattern,
+                        n=n,
+                        tmp=work,
+                        worker_mode=worker_mode,
+                        worker_urls=worker_urls,
+                        worker_client_factory=worker_client_factory,
+                        hardware=hardware,
+                        vllm_version=vllm_version,
+                        replica_mode=replica_mode,
+                    )
                 )
         return rows
 
@@ -183,18 +303,7 @@ def run_matrix(
         with tempfile.TemporaryDirectory(prefix="atlas_phase5_") as td:
             rows = _execute(Path(td))
 
-    fieldnames = [
-        "pattern",
-        "strategy",
-        "n",
-        "ttft_p50_ms",
-        "ttft_p95_ms",
-        "tokens_per_s_mean",
-        "cache_hit_pct",
-        "worker_skew",
-        "worker_counts",
-        "worker_mode",
-    ]
+    fieldnames = LIVE_FIELDNAMES if worker_mode == "live" else SIM_FIELDNAMES
     with out_csv.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -204,13 +313,59 @@ def run_matrix(
 
 
 def main() -> None:
-    rows = run_matrix()
-    print(f"wrote {DEFAULT_OUT} ({len(rows)} rows)")
+    parser = argparse.ArgumentParser(description="Atlas routing matrix harness")
+    parser.add_argument(
+        "--worker-mode",
+        choices=("simulated", "live"),
+        default="simulated",
+    )
+    parser.add_argument("--patterns", default="", help="comma list; default all/min")
+    parser.add_argument("--strategies", default="", help="comma list")
+    parser.add_argument("--n", type=int, default=24)
+    parser.add_argument("--out", type=Path, default=None)
+    parser.add_argument("--hardware", default="colab-t4")
+    parser.add_argument("--vllm-version", default="0.26.0")
+    parser.add_argument("--replica-mode", default="time_sliced_dual")
+    parser.add_argument("--worker-a-url", default=DEFAULT_LIVE_URLS[0])
+    parser.add_argument("--worker-b-url", default=DEFAULT_LIVE_URLS[1])
+    args = parser.parse_args()
+
+    patterns = (
+        [p.strip() for p in args.patterns.split(",") if p.strip()]
+        if args.patterns
+        else (["high_reuse"] if args.worker_mode == "live" else None)
+    )
+    strategies = (
+        [s.strip() for s in args.strategies.split(",") if s.strip()]
+        if args.strategies
+        else (
+            ["round_robin", "prefix_aware"]
+            if args.worker_mode == "live"
+            else None
+        )
+    )
+
+    rows = run_matrix(
+        patterns=patterns,
+        strategies=strategies,
+        n=args.n,
+        out_csv=args.out,
+        worker_mode=args.worker_mode,
+        worker_urls=(args.worker_a_url, args.worker_b_url),
+        hardware=args.hardware,
+        vllm_version=args.vllm_version,
+        replica_mode=args.replica_mode,
+    )
+    out = args.out or (
+        DEFAULT_LIVE_OUT if args.worker_mode == "live" else DEFAULT_OUT
+    )
+    print(f"wrote {out} ({len(rows)} rows)")
     for row in rows:
         print(
             f"{row['pattern']:12} {row['strategy']:13} "
             f"p50={row['ttft_p50_ms']} p95={row['ttft_p95_ms']} "
-            f"hit%={row['cache_hit_pct']} skew={row['worker_skew']}"
+            f"hit%={row['cache_hit_pct']} skew={row['worker_skew']} "
+            f"mode={row['worker_mode']}"
         )
 
 
