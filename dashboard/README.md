@@ -5,7 +5,12 @@ Phase 5.5 live metrics UI. Served by the gateway at `/dashboard/`.
 ## Run
 
 ```powershell
-# terminal 1 — gateway (fake worker via tests/factory, or real workers.yaml URLs)
+# terminal 1 — gateway (PYTHONPATH required; --app-dir alone misses atlas_metrics etc.)
+cd C:\projects\Atlas
+$env:PYTHONPATH = @(
+  "platform\gateway","platform\tenant","platform\registry",
+  "platform\router","platform\observability","workers"
+) -join ";"
 uv run uvicorn app:create_app_from_env --factory --app-dir platform/gateway --port 8080
 
 # browser

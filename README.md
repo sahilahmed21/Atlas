@@ -1,107 +1,138 @@
 # Atlas
 
-**One-sentence framing:** production-grade multi-tenant LLM serving behavior on constrained hardware (laptop 3050 + free-tier T4), without assuming multi-node / RDMA infrastructure.
+**Multi-tenant LLM inference control plane on free-path GPUs** — an OpenAI-compatible gateway with cache-aware routing, measured end-to-end on a laptop RTX 3050 (4 GiB) and Colab T4. Not a Kubernetes / multi-node / RDMA claim.
 
-Atlas is a research-grade ML systems platform: OpenAI-compatible APIs and intelligent routing on top of real measured serving behavior — not "I deployed vLLM on Kubernetes."
+[Demo video](docs/demo/atlas-demo.mp4) · [Measured results](results/) · [Architecture](docs/architecture/MVP_ARCHITECTURE.md) · [What shipped](docs/GOALS_AND_SUCCESS.md)
 
-## Constraint (non-negotiable)
+---
 
-| Reality | Implication |
+## At a glance
+
+| | |
 | --- | --- |
-| Free path only (Colab/Kaggle T4 + laptop 3050) | Multi-replica = time-sliced processes or sequential runs |
-| Single consumer GPU | Disaggregation / RDMA is future work, not faked |
-| Eye-stoppers must be real | Phase 1 failure curve, Phase 3 before/after, Phase 5.5 live dashboard |
+| **What it is** | FastAPI OpenAI-compatible API → tenant auth + RPM → routing → vLLM/stub workers → Prometheus + live dashboard |
+| **What we measured** | Naive HF latency cliff; vLLM reconciliation; where sticky prefix routing loses; live dual-vLLM validation; load-gate behavior |
+| **Hardware** | ₹0 path: RTX 3050 4 GiB + Colab/Kaggle T4 (time-sliced dual replicas) |
+| **Stack** | Python 3.11+, FastAPI, httpx, Prometheus, SSE dashboard, vLLM 0.26.0 (Colab) |
+| **Honesty** | Simulation ≠ GPU. Router affinity ≠ engine APC. Process-local RPM/events. No DistServe/RDMA theater. |
 
-## Repo map
-
-```
-fundamentals/   # Phase 1–2: memory math, toy allocators/schedulers/caches
-platform/       # Phase 4+: gateway, tenant, router, registry, observability
-workers/        # vLLM wrappers, health — workers know nothing about tenants
-benchmarks/     # load tests, compare HF vs vLLM, routing experiments
-dashboard/      # Phase 5.5 live view
-notebooks/      # Colab / Kaggle / local notebooks
-configs/        # models, tenants, routing strategies
-results/        # measured numbers (CSV/JSON); charts live under docs/experiments
-deploy/         # Helm/K8s — grows in Phase 4+, empty until needed
-docs/           # every phase, knowledge, research, ADRs, pitch
-scripts/        # one-shot runners
+```text
+Client ──► Gateway (auth · RPM · route) ──► Worker A / Worker B (OpenAI HTTP)
+                │
+                └── observe_request ──► Prometheus + SSE event ring ──► /dashboard/
 ```
 
-MVP lives under `fundamentals/` + thin `platform/gateway`. Final architecture fills `platform/`, `workers/`, `deploy/` without reshuffling.
+---
 
-**Architecture:** [Full deep dive](docs/architecture/PROJECT_DEEP_DIVE.md) · [MVP](docs/architecture/MVP_ARCHITECTURE.md) · [Target / production](docs/architecture/TARGET_ARCHITECTURE.md)
+## Demo (90s)
 
-## Phases
+Watch: **[docs/demo/atlas-demo.mp4](docs/demo/atlas-demo.mp4)**
 
-| Phase | Goal | Eye-stopper |
-| --- | --- | --- |
-| 0 | Setup + framing | Framing sentence locked |
-| 1 | Memory math + naive HF baseline | OOM / latency-collapse curve |
-| 2 | Toy paged allocator, continuous batch, prefix cache | Each mechanism tied to Phase 1 failure |
-| 3 | Real vLLM + source reconciliation | Naive vs vLLM on one chart |
-| 4 | Platform layer; router as centerpiece | Prefix-aware router vs round robin |
-| 5 | Routing experiment (find where smart loses) | Surprising underperformance case |
-| 5.5 | Live dashboard + 90s demo | Real-time route/cache/TTFT view |
-| 6 | Honest write-up + pitch | Constraint → future work coherent |
-| 7 | Live GPU routing validation | `results/phase5-live/` surprise (confirm/refute) |
-| 8 | TTFT / load gate | Before/after: RR vs sticky vs gated |
-| 9 | Shock package | 90s video + public README sell |
-| 10 | Optional JD widener | One of RAG / eval / cost |
+What the recording shows: live request feed (worker, cache signal, route reason, TTFT), sticky prefix affinity, then load-gate breaking stickiness — with the free-path honesty constraint stated up front.
 
-Details: [`docs/phases/`](docs/phases/) · Hire-signal arc: [`docs/phases/NEXT_ARC.md`](docs/phases/NEXT_ARC.md) · Phase 7 start: [`docs/phases/phase-7/START_HERE.md`](docs/phases/phase-7/START_HERE.md)
+---
 
-## Hardware (₹0)
+## Quick start (laptop, no GPU)
 
-| Phase | Hardware |
-| --- | --- |
-| 0, 1, 2 | Laptop (3050 + CPU) |
-| 3 | Colab / Kaggle T4 |
-| 4 | Laptop + Colab for GPU tests |
-| 5, 5.5 | Offline sim + laptop dashboard (live GPU optional) |
-| 6 | Laptop (docs) |
-| 7–8 | Colab / Kaggle T4 dual time-sliced vLLM |
-| 9 | Laptop (record + publish) |
-| 10 | Laptop ± T4 depending on track |
-
-## Quick start (Phase 0 done → Phase 1)
-
-Requires [uv](https://docs.astral.sh/uv/). See [`docs/runbooks/UV.md`](docs/runbooks/UV.md).
+Requires [uv](https://docs.astral.sh/uv/).
 
 ```powershell
-cd c:\projects\Atlas
+cd C:\projects\Atlas
 uv sync
-uv run python -c "import torch; print(torch.__version__)"
-
-# follow Phase 1
-# docs/phases/phase-1/START_HERE.md
 ```
 
-Phase 3 vLLM: pin `0.26.0` via Colab `+cu129` wheel — see `docs/runbooks/COLAB_KAGGLE.md` (not `uv sync --group gpu`).
+**1. Two stub workers** (OpenAI-compatible stand-ins on `:8001` / `:8002` — see [docs/phases/phase-5.5/DEMO.md](docs/phases/phase-5.5/DEMO.md) for the pasteable stubs), matching `configs/models/workers.yaml`.
 
-## Story so far (measured)
+**2. Gateway** — `PYTHONPATH` is required (`package = false` layout):
 
-1. **Constraint** — free-path 3050 + T4; no multi-node/RDMA claimed.
-2. **Naive cliff** — Qwen2.5-0.5B HF on 3050: N=8 → **5.5×** p50 latency (`results/phase1/`).
-3. **Built** — Phase 2 CPU toys ≠ Phase 4+ FastAPI gateway/router (`platform/`).
-4. **Surprise** — offline high_reuse: prefix-aware wins hits, **loses** simulated TTFT vs RR (`results/phase5/SURPRISE.md`).
-5. **Live** — `/dashboard/` from request-path events (video deferred).
-6. **Live (WEAKENED)** — dual vLLM T4: sticky still ~1.17× slower p50 than RR; affinity/skew match sim (`results/phase5-live/`).
-7. **Next** — Phase 8 load gate → Phase 9 demo/public ([NEXT_ARC](docs/phases/NEXT_ARC.md)).
+```powershell
+$env:PYTHONPATH = @(
+  "platform\gateway", "platform\tenant", "platform\registry",
+  "platform\router", "platform\observability", "workers"
+) -join ";"
+$env:ATLAS_STRATEGY = "prefix_aware"
+$env:ATLAS_PREFIX_LOAD_MARGIN = "0"   # sticky; set "1" to enable load gate
+uv run uvicorn app:create_app_from_env --factory --app-dir platform/gateway --port 8080
+```
 
-Pitch: [`docs/pitch/ONE_PARAGRAPH.md`](docs/pitch/ONE_PARAGRAPH.md) · Phase 6: [`docs/phases/phase-6/`](docs/phases/phase-6/)
+**3. Dashboard:** open http://127.0.0.1:8080/dashboard/ · Connect with `sk-atlas-demo-key` (demo key in `configs/tenants/example.yaml`).
 
-## Status
+**4. Drive load** (shared system prompt / high reuse):
 
-- [x] Phase 0 skeleton + docs library
-- [x] Phase 1 memory math + naive baseline
-- [x] Phase 2 toy mechanisms
-- [x] Phase 3 vLLM reconciliation
-- [x] Phase 4 platform + router
-- [x] Phase 5 routing experiment (offline sim)
-- [x] Phase 5.5 live dashboard (video deferred → Phase 9)
-- [x] Phase 6 honest write-up + pitch
-- [x] Phase 7 live GPU routing validation (WEAKENED)
-- [ ] Phase 8 TTFT / load gate
-- [ ] Phase 9 shock package (demo + public)
-- [ ] Phase 10 optional widener
+```powershell
+$env:PYTHONPATH = "benchmarks;$env:PYTHONPATH"
+uv run python benchmarks/demo_load.py
+# or: uv run python benchmarks/run_routing_matrix.py --n 24
+```
+
+**Health:** `GET /healthz` · **Metrics:** `GET /metrics` (Bearer) · **Events:** `GET /atlas/events?api_key=sk-atlas-demo-key`
+
+Live GPU path (Colab dual vLLM): [docs/runbooks/COLAB_KAGGLE.md](docs/runbooks/COLAB_KAGGLE.md) · Phase 7 notes under `docs/phases/phase-7/`.
+
+---
+
+## Proof of results (open the files)
+
+| Finding | Evidence |
+| --- | --- |
+| **Naive HF cliff** — Qwen2.5-0.5B on RTX 3050: N=8 p50 **9242 ms** ≈ **5.5×** N=1 (**1671 ms**); peak VRAM ~1.04 GiB (torch) | [results/phase1/](results/phase1/) |
+| **vLLM on T4** — pin **0.26.0**; batch wall ~210–266 ms N=1..8; ~15 GB NVML (KV prealloc). Overlay vs Phase 1 is **cross-hardware** | [results/phase3/](results/phase3/) |
+| **Sim surprise** — high_reuse sticky routing: hit% **95.8**, skew **1.0**, TTFT p50 **2×** worse than round-robin (`worker_mode=simulated`) | [results/phase5/SURPRISE.md](results/phase5/SURPRISE.md) |
+| **Live dual vLLM** — same affinity pattern; sticky ~**1.17×** p50 vs RR → verdict **WEAKENED** (not a confirmed 2× GPU cliff) | [results/phase5-live/SURPRISE_GPU.md](results/phase5-live/SURPRISE_GPU.md) |
+| **Load gate** — sim recovers sticky cliff to RR-class; live confirms break mechanics (`hit_broken` 50%, skew 0.5); **live TTFT win vs sticky not claimed** that run | [results/phase8/BEFORE_AFTER.md](results/phase8/BEFORE_AFTER.md) |
+
+Claim rules: [docs/phases/phase-6/CLAIM_INVENTORY.md](docs/phases/phase-6/CLAIM_INVENTORY.md)
+
+---
+
+## What shipped
+
+| Layer | Contents |
+| --- | --- |
+| **Fundamentals** | Memory/concurrency baseline, CPU toys for paging / continuous batch / prefix hash |
+| **Platform** | Gateway, YAML tenants, process-local RPM, RR / least-load / prefix-aware (+ load gate), worker registry |
+| **Workers** | Thin OpenAI HTTP client; vLLM pin helper |
+| **Benchmarks** | Frozen traffic traces, sim + live routing matrices |
+| **Observability** | Prometheus + request-path event ring + `/dashboard/` |
+| **Docs** | Phase ACs, runbooks, architecture diagrams, success criteria |
+
+Status checklist and phase index: [docs/phases/README.md](docs/phases/README.md) · Success write-up: [docs/GOALS_AND_SUCCESS.md](docs/GOALS_AND_SUCCESS.md)
+
+---
+
+## Repository layout
+
+```text
+fundamentals/   # Phase 1–2 experiments + CPU sims
+platform/       # gateway, tenant, router, registry, observability
+workers/        # OpenAI worker client (no tenant logic)
+benchmarks/     # routing matrix + demo load
+dashboard/      # static live UI
+configs/        # tenants, workers, models
+results/        # CSV / charts / SURPRISE write-ups  ← proof
+docs/           # architecture, phases, runbooks
+docs/demo/      # demo recording
+```
+
+---
+
+## Tests
+
+```powershell
+uv run pytest platform workers benchmarks -q
+```
+
+---
+
+## Non-goals (explicit)
+
+- Multi-region / RDMA / DistServe-as-implemented  
+- Claiming router `cache_signal` as vLLM automatic prefix-cache hit rate  
+- Multi-replica-safe RPM or event bus (labeled **process-local**)  
+- KEDA / Helm as a live cluster (planning sketches only)
+
+---
+
+## License / key
+
+Demo API key in-repo is synthetic (`sk-atlas-demo-key`). Do not use it outside local demos.

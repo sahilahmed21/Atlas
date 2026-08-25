@@ -118,23 +118,23 @@ class PrefixAwareRouter:
                         worker_id=alt.id,
                         strategy="prefix_aware",
                         reason=(
-                            f"prefix hit broken by load_gate "
-                            f"load={owner_load} vs alt={alt_load} "
-                            f"margin={self.load_margin} ->{alt.id}"
+                            f"gate: sticky break prefix={key[:8]} "
+                            f"owner={owner} load={owner_load} "
+                            f"-> {alt.id} load={alt_load}"
                         ),
                         cache_signal="hit_broken",
                     )
             return RouteDecision(
                 worker_id=owner,
                 strategy="prefix_aware",
-                reason=f"prefix hit hash={key} ->{owner}",
+                reason=f"hit: prefix={key[:8]} -> {owner}",
                 cache_signal="hit",
             )
         claim = _least_load_worker(workers, loads)
         return RouteDecision(
             worker_id=claim.id,
             strategy="prefix_aware",
-            reason=f"prefix miss hash={key}; least_load claim ->{claim.id}",
+            reason=f"miss: prefix={key[:8]} claim -> {claim.id}",
             cache_signal="miss",
         )
 

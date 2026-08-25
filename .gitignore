@@ -26,6 +26,12 @@ results/**/*.mp4
 # Repo-root weights only — do NOT use bare `models/` (that ignores configs/models/).
 /models/
 
+# Local interview prep — never publish
+docs/interview/
+
+# Optional duplicate demo path with spaces (canonical: docs/demo/atlas-demo.mp4)
+docs/demo video/
+
 # OS / IDE
 .DS_Store
 Thumbs.db

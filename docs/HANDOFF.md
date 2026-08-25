@@ -136,5 +136,9 @@ before/after matrix. Respect honesty; no DistServe; no “confirmed 2×”.
 | Phase 7 ACs / RUN_LOG | `docs/phases/phase-7/` |
 | Phase 8 start | `docs/phases/phase-8/README.md` |
 | Claim inventory | `docs/phases/phase-6/CLAIM_INVENTORY.md` |
+| Demo video | `docs/demo/atlas-demo.mp4` |
+| Goals / success | `docs/GOALS_AND_SUCCESS.md` |
 | Hire-signal arc | `docs/phases/NEXT_ARC.md` |
 | Deep dive | `docs/architecture/PROJECT_DEEP_DIVE.md` |
+
+> Interview grill packs live under `docs/interview/` **locally only** (gitignored — do not commit).

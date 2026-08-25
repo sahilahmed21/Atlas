@@ -12,7 +12,8 @@ Gate for pitch / README / resume. Every public number must appear here as **allo
 | Phase 3: vLLM **0.26.0+cu129** on Colab T4; batch wall ~210–266 ms N=1..8; ~15 GB flat NVML | `results/phase3/vllm_load.csv`, `naive_vs_vllm.png` | Overlay is **cross-hardware** (3050 vs T4); latency = batch wall, not streaming TTFT |
 | Phase 4: FastAPI OpenAI-compatible gateway, YAML tenants, process-local RPM, router strategies, Prometheus | `platform/` | Offline-hardened; live dual-vLLM optional |
 | Phase 5 high_reuse × prefix_aware: hit% **95.83**, skew **1.0**, TTFT p50 **297.5** vs RR **147.5** (2× worse) | `results/phase5/routing_matrix.csv`, `SURPRISE.md` | **`worker_mode=simulated` only** — not GPU TTFT / vLLM APC |
-| Phase 5.5: live `/dashboard/` + `/atlas/events` from same `observe_request` path as Prometheus | `dashboard/`, `platform/observability/`, `docs/phases/phase-5.5/DEMO.md` | Process-local event ring; no prompt text; **video not recorded** |
+| Phase 5.5: live `/dashboard/` + `/atlas/events` from same `observe_request` path as Prometheus | `dashboard/`, `platform/observability/`, `docs/phases/phase-5.5/DEMO.md` | Process-local event ring; no prompt text |
+| Demo recording (recruiter glance) | `docs/demo/atlas-demo.mp4`, root `README.md` | Stubs prove routing/dashboard; cite CSV for GPU TTFT |
 | Phase 7 live high_reuse on Colab T4 dual vLLM 0.26.0 (`time_sliced_dual`): RR TTFT p50 **28.557** / p95 **36.400**; prefix_aware p50 **33.320** / p95 **44.787**, hit% **95.83**, skew **1.0** (~1.17× p50 vs RR) | `results/phase5-live/routing_matrix_live.csv`, `SURPRISE_GPU.md` | Streaming TTFT; router hit ≠ vLLM APC; **WEAKENS** sim’s ~2× cliff |
 | Phase 7 verdict: sim magnitude **weakened**; affinity/skew pattern **preserved** | `SURPRISE_GPU.md` | Do not say “confirmed 2× GPU penalty” |
 | Phase 8 sim high_reuse: sticky prefix p50 **297.5** → gated prefix p50 **147.5** (= RR); skew 1.0 → 0.5; `hit_broken` **50%** at margin=1 | `results/phase8/gate_matrix.csv`, `BEFORE_AFTER.md` | Soft served pressure + in-flight; **heuristic ≠ llm-d EPP** |
@@ -30,7 +31,7 @@ Gate for pitch / README / resume. Every public number must appear here as **allo
 | “Atlas load gate = llm-d EPP / production TTFT predictor” | Heuristic served+in-flight margin only |
 | “Gate always improves live TTFT” | Live `gate_matrix_live.csv`: sticky beat gated on this T4 run |
 | Generic “prefix-aware improved X%” | Headline cells are sticky *loss* (small live, large sim) |
-| Empty demo video URL | Honesty: omit until a real recording exists |
+| Empty / fake demo video | Prefer real file under `docs/demo/`; do not invent YouTube URLs |
 | Mixing Phase 1 torch peak with Phase 3 NVML as one meter | Different meters |
 | Mixing Phase 3 batch wall with Phase 7 streaming TTFT | Different meters |
 | Unlabeled 3050↔T4 overlay as same-GPU win | Must stay labeled cross-hardware |
@@ -44,7 +45,7 @@ Gate for pitch / README / resume. Every public number must appear here as **allo
 | Prefill/decode disaggregation | Needs multiple GPUs + fast interconnect; interference exists on one T4 but cannot be scheduled away by topology | `docs/research/distserve/ATLAS_RELEVANCE.md` |
 | Production llm-d / multi-node | Inspired by llm-d cache-aware concerns; not an llm-d deploy | `docs/research/llm-d/ATLAS_RELEVANCE.md` |
 | Phase 8 live gate matrix | Optional Colab confirm of sim recovery | `docs/phases/phase-8/` |
-| Phase 5.5 90s video + public package | UI + runbook ready; cite WEAKENED live + gate honestly | **Phase 9** `docs/phases/phase-9/` · `docs/phases/phase-5.5/DEMO.md` |
+| Phase 5.5 90s video + public package | **Done** — `docs/demo/atlas-demo.mp4` + root README | Cite WEAKENED + gate honestly |
 | Optional JD widener | One of RAG / eval / cost — only after Phase 9 | **Phase 10** `docs/phases/phase-10/` |
 | Optional fuller live matrix | least_load / low_reuse cells — not required for Phase 7 close | Phase 7 README |
 

@@ -1,125 +1,382 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Atlas live dashboard</title>
-  <style>
-    :root {
-      --bg: #0f1419;
-      --panel: #1a2332;
-      --text: #e7ecf3;
-      --muted: #8b9bb4;
-      --hit: #3d9a6a;
-      --miss: #c47a3a;
-      --accent: #5b8def;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "Segoe UI", system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      padding: 1.25rem;
-    }
-    h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
-    .banner {
-      color: var(--muted);
-      font-size: 0.85rem;
-      margin-bottom: 1rem;
-      max-width: 52rem;
-    }
-    .row { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; }
-    .card {
-      background: var(--panel);
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      min-width: 8rem;
-    }
-    .card strong { display: block; font-size: 1.4rem; }
-    .card span { color: var(--muted); font-size: 0.75rem; }
-    label { color: var(--muted); font-size: 0.8rem; }
-    input {
-      background: #0c1017;
-      border: 1px solid #2a3548;
-      color: var(--text);
-      padding: 0.4rem 0.6rem;
-      border-radius: 4px;
-      min-width: 16rem;
-    }
-    button {
-      background: var(--accent);
-      color: #fff;
-      border: 0;
-      border-radius: 4px;
-      padding: 0.45rem 0.9rem;
-      cursor: pointer;
-    }
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid #243044; }
-    th { color: var(--muted); font-weight: 600; }
-    .hit { color: var(--hit); }
-    .miss { color: var(--miss); }
-    #clock { font-variant-numeric: tabular-nums; }
-    #chart {
-      height: 80px;
-      display: flex;
-      align-items: flex-end;
-      gap: 2px;
-      background: var(--panel);
-      padding: 0.5rem;
-      border-radius: 8px;
-      margin-bottom: 1rem;
-    }
-    #chart i {
-      display: block;
-      width: 6px;
-      background: var(--accent);
-      border-radius: 2px 2px 0 0;
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Atlas · live routing</title>
+<style>
+  :root {
+    --bg: #05080b;
+    --panel: #0d141b;
+    --panel-soft: #101a23;
+    --border: #1c2834;
+    --border-soft: #162029;
+    --text: #e3ecf4;
+    --text-dim: #9fb2c4;
+    --muted: #5c7086;
+    --accent: #57c7ff;
+    --accent-soft: rgba(87, 199, 255, 0.14);
+    --hit: #34d399;
+    --miss: #f5a524;
+    --gate: #fb5a7e;
+    --na: #4d6072;
+    --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", "Cascadia Code", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 28px 28px;
+    background-attachment: fixed;
+    padding: 1.25rem 1.5rem 2.5rem;
+    min-height: 100vh;
+  }
+  a { color: var(--accent); }
+
+  /* ---- top bar ---- */
+  .topbar {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  .brand { display: flex; align-items: center; gap: 0.65rem; }
+  .mark {
+    width: 30px; height: 30px; border-radius: 7px;
+    background:
+      linear-gradient(135deg, var(--accent) 0%, #6a7cff 100%);
+    position: relative;
+    flex: none;
+  }
+  .mark::before, .mark::after {
+    content: ""; position: absolute; background: rgba(5,8,11,0.85);
+  }
+  .mark::before { width: 6px; height: 6px; top: 6px; left: 6px; border-radius: 1px; }
+  .mark::after { width: 6px; height: 6px; bottom: 6px; right: 6px; border-radius: 1px; }
+  .brand h1 {
+    font-size: 1rem; margin: 0; letter-spacing: 0.06em; font-weight: 700;
+    text-transform: uppercase;
+  }
+  .brand .tag {
+    display: block; font-size: 0.68rem; color: var(--muted);
+    letter-spacing: 0.12em; text-transform: uppercase; margin-top: 1px;
+  }
+  .topbar-right { display: flex; align-items: center; gap: 0.9rem; }
+  #clock {
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+    color: var(--text-dim); font-size: 0.85rem;
+  }
+  .pill {
+    font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 0.3rem 0.65rem; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--muted);
+    display: inline-flex; align-items: center; gap: 0.45rem;
+  }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .pill.idle .dot { background: var(--muted); }
+  .pill.connecting .dot, .pill.reconnecting .dot { background: var(--miss); animation: pulse 1s infinite; }
+  .pill.live { color: var(--hit); border-color: rgba(52,211,153,0.35); background: rgba(52,211,153,0.06); }
+  .pill.live .dot { background: var(--hit); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 currentColor; } 50% { opacity: 0.45; } }
+
+  /* ---- honesty popover ---- */
+  .honesty-btn {
+    width: 26px; height: 26px; border-radius: 50%; flex: none;
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    font-family: var(--font-mono); font-size: 0.75rem; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0; cursor: pointer;
+  }
+  .honesty-btn:hover, .honesty-btn[aria-expanded="true"] {
+    color: var(--accent); border-color: var(--accent);
+  }
+  .honesty-pop {
+    display: none;
+    position: absolute; top: calc(100% + 8px); right: 0; z-index: 20;
+    background: var(--panel-soft); border: 1px solid var(--border-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px; padding: 0.65rem 0.9rem;
+    font-size: 0.78rem; line-height: 1.45; color: var(--text-dim);
+    width: min(26rem, calc(100vw - 3rem));
+    box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+  }
+  .honesty-pop.open { display: block; }
+  .honesty-pop b { color: var(--text); font-weight: 600; }
+  .honesty-wrap { position: relative; }
+
+  /* ---- connect ---- */
+  .connect {
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+    margin-bottom: 1rem; transition: opacity 0.2s ease;
+  }
+  .connect label {
+    color: var(--muted); font-size: 0.68rem; letter-spacing: 0.1em;
+    text-transform: uppercase; font-family: var(--font-mono);
+  }
+  .connect .field { display: flex; flex-direction: column; gap: 0.3rem; }
+  input {
+    font-family: var(--font-mono);
+    background: #080c10; border: 1px solid var(--border); color: var(--text);
+    padding: 0.45rem 0.65rem; border-radius: 5px; min-width: 17rem; font-size: 0.82rem;
+  }
+  input:focus { outline: none; border-color: var(--accent); }
+  button {
+    background: var(--accent); color: #04121c; border: 0; font-weight: 600;
+    border-radius: 5px; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.82rem;
+    align-self: flex-end;
+  }
+  button:hover { filter: brightness(1.08); }
+  .chip {
+    display: none; align-items: center; gap: 0.55rem; font-family: var(--font-mono);
+    font-size: 0.78rem; color: var(--text-dim); background: var(--panel-soft);
+    border: 1px solid var(--border-soft); border-radius: 999px; padding: 0.35rem 0.75rem;
+  }
+  .chip button { background: transparent; color: var(--accent); padding: 0; font-weight: 600; }
+  body.is-connected .connect .field, body.is-connected .connect > button { display: none; }
+  body.is-connected .chip { display: inline-flex; }
+
+  /* ---- grid ---- */
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 19rem;
+    grid-template-areas: "main side";
+    gap: 1rem;
+    align-items: start;
+  }
+  @media (max-width: 980px) {
+    .grid { grid-template-columns: 1fr; grid-template-areas: "side" "main"; }
+  }
+  .main { grid-area: main; display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+  .side { grid-area: side; display: flex; flex-direction: column; gap: 1rem; }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0.9rem 1rem;
+  }
+  .panel-head {
+    display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.7rem;
+  }
+  .panel-head h2 {
+    font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-dim); margin: 0; font-weight: 700;
+  }
+  .panel-head .sub {
+    font-size: 0.68rem; color: var(--muted); font-family: var(--font-mono);
+  }
+  .legend { display: flex; gap: 0.75rem; font-size: 0.68rem; color: var(--muted); font-family: var(--font-mono); }
+  .legend span { display: inline-flex; align-items: center; gap: 0.3rem; }
+  .legend i { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
+
+  /* ---- kpis ---- */
+  .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+  .kpi {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 9px;
+    padding: 0.6rem 0.75rem;
+  }
+  .kpi span {
+    display: block; font-size: 0.65rem; color: var(--muted); letter-spacing: 0.08em;
+    text-transform: uppercase; margin-bottom: 0.25rem;
+  }
+  .kpi strong {
+    font-family: var(--font-mono); font-size: 1.25rem; font-weight: 600; color: var(--text);
+  }
+  .kpi.wide { grid-column: 1 / -1; }
+  .kpi.gate strong { color: var(--gate); }
+  .kpi.hitrate strong { color: var(--hit); }
+
+  /* ---- affinity lanes ---- */
+  .lanes { display: flex; flex-direction: column; gap: 0.5rem; }
+  .empty {
+    color: var(--muted); font-size: 0.8rem; font-family: var(--font-mono);
+    padding: 0.75rem 0; text-align: center; border: 1px dashed var(--border-soft); border-radius: 8px;
+  }
+  .lane { display: grid; grid-template-columns: 8.5rem 1fr 5.5rem; align-items: center; gap: 0.6rem; }
+  .lane-label { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
+  .lane-label i { width: 9px; height: 9px; border-radius: 50%; flex: none; box-shadow: 0 0 6px currentColor; }
+  .lane-label span {
+    font-family: var(--font-mono); font-size: 0.8rem; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .track {
+    display: flex; align-items: center; gap: 2px; height: 22px;
+    background: var(--panel-soft); border: 1px solid var(--border-soft);
+    border-radius: 5px; padding: 0 4px; overflow: hidden;
+  }
+  .tick {
+    width: 7px; height: 13px; border-radius: 2px; flex: none;
+    animation: land 0.25s ease-out;
+  }
+  @keyframes land { from { transform: scaleY(0.2); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
+  .lane-stat {
+    font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); text-align: right;
+  }
+
+  /* ---- ttft chart ---- */
+  #chart {
+    height: 84px; display: flex; align-items: flex-end; gap: 2px;
+    background: var(--panel-soft); border: 1px solid var(--border-soft);
+    border-radius: 8px; padding: 0.5rem; margin-bottom: 0.5rem;
+  }
+  #chart i { display: block; width: 5px; border-radius: 2px 2px 0 0; flex: none; }
+  .chart-stats { display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--muted); font-family: var(--font-mono); }
+
+  /* ---- log ---- */
+  .log-wrap { max-height: 26rem; overflow-y: auto; border-radius: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.78rem; font-family: var(--font-mono); }
+  thead th {
+    position: sticky; top: 0; background: var(--panel);
+    text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border);
+    color: var(--muted); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; font-size: 0.65rem;
+  }
+  tbody td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border-soft); color: var(--text-dim); vertical-align: top; }
+  tbody tr { border-left: 2px solid transparent; }
+  tbody tr.gate { background: rgba(251, 90, 126, 0.07); border-left-color: var(--gate); }
+  tbody tr:hover { background: rgba(87, 199, 255, 0.04); }
+  td.worker { color: var(--text); font-weight: 500; }
+  td.time { color: var(--muted); white-space: nowrap; }
+  td.reason { color: var(--text-dim); max-width: 28rem; word-break: break-word; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; }
+  .sig {
+    display: inline-block; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em;
+    padding: 0.12rem 0.4rem; border-radius: 3px; line-height: 1.2;
+  }
+  .sig.hit { background: rgba(52,211,153,0.14); color: var(--hit); }
+  .sig.miss { background: rgba(245,165,36,0.14); color: var(--miss); }
+  .sig.gate { background: rgba(251,90,126,0.16); color: var(--gate); }
+  .sig.na { background: rgba(77,96,114,0.2); color: var(--na); }
+  .badge {
+    font-size: 0.6rem; padding: 0.05rem 0.35rem; border-radius: 3px; margin-left: 0.4rem;
+    background: rgba(251,90,126,0.15); color: var(--gate); letter-spacing: 0.05em;
+  }
+</style>
 </head>
 <body>
-  <h1>Atlas live dashboard</h1>
-  <p class="banner">
-    Honesty: metrics come from the gateway <strong>request path</strong> only
-    (same observe site as Prometheus). Queue depth and RPM are
-    <strong>process-local</strong>. Router cache_signal is not vLLM APC.
-    Simulated workers are fine for demos when labeled.
-  </p>
-
-  <div class="row">
-    <div>
-      <label for="apiKey">API key</label><br />
-      <input id="apiKey" type="password" value="sk-atlas-demo-key" autocomplete="off" />
-      <button id="connectBtn" type="button">Connect</button>
+  <div class="topbar">
+    <div class="brand">
+      <div class="mark"></div>
+      <div>
+        <h1>Atlas</h1>
+        <span class="tag">Live routing console</span>
+      </div>
     </div>
-    <div class="card"><span>Live clock</span><strong id="clock">—</strong></div>
-    <div class="card"><span>Events</span><strong id="nEvents">0</strong></div>
-    <div class="card"><span>Hits</span><strong id="nHits">0</strong></div>
-    <div class="card"><span>Misses</span><strong id="nMisses">0</strong></div>
-    <div class="card"><span>Status</span><strong id="status">idle</strong></div>
+    <div class="topbar-right">
+      <span id="clock">—</span>
+      <span class="pill idle" id="statusPill"><i class="dot"></i><span id="status">idle</span></span>
+      <div class="honesty-wrap">
+        <button class="honesty-btn" id="honestyBtn" type="button" aria-expanded="false" aria-label="Honesty notes">i</button>
+        <div class="honesty-pop" id="honestyPop" role="note">
+          <b>Honesty:</b> metrics come from the gateway <b>request path</b> only (same observe
+          site as Prometheus). Queue depth and RPM are <b>process-local</b>. Router
+          <b>cache_signal</b> is not vLLM APC. Simulated workers are fine for demos when labeled.
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div id="chart" aria-label="TTFT bars"></div>
+  <div class="connect">
+    <div class="field">
+      <label for="apiKey">Tenant key</label>
+      <input id="apiKey" type="password" value="sk-atlas-demo-key" autocomplete="off" />
+    </div>
+    <button id="connectBtn" type="button">Connect</button>
+    <span class="chip" id="connChip">
+      <span id="connChipKey"></span> · connected
+      <button id="changeKeyBtn" type="button">change</button>
+    </span>
+  </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Time</th>
-        <th>Worker</th>
-        <th>Strategy</th>
-        <th>Cache</th>
-        <th>TTFT ms</th>
-        <th>tok/s</th>
-        <th>Reason</th>
-      </tr>
-    </thead>
-    <tbody id="tbody"></tbody>
-  </table>
+  <div class="grid">
+    <div class="main">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Worker affinity</h2>
+          <div class="legend">
+            <span><i style="background:var(--hit)"></i>hit</span>
+            <span><i style="background:var(--miss)"></i>miss</span>
+            <span><i style="background:var(--gate)"></i>gate</span>
+            <span><i style="background:var(--na)"></i>n/a</span>
+          </div>
+        </div>
+        <div class="lanes" id="lanes">
+          <div class="empty">No requests yet — connect and drive traffic to see routing lanes fill in.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Request log</h2>
+          <span class="sub" id="strategyTag">strategy: —</span>
+        </div>
+        <div class="log-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Worker</th>
+                <th>Strategy</th>
+                <th>Cache</th>
+                <th>TTFT</th>
+                <th>tok/s</th>
+                <th>Detail</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="kpis">
+        <div class="kpi wide"><span>Events</span><strong id="nEvents">0</strong></div>
+        <div class="kpi hitrate"><span>Hit rate</span><strong id="hitRate">—</strong></div>
+        <div class="kpi gate"><span>Gate events</span><strong id="nGate">0</strong></div>
+        <div class="kpi"><span>Active workers</span><strong id="nWorkers">0</strong></div>
+        <div class="kpi"><span>Peak skew</span><strong id="skew">—</strong></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>TTFT</h2>
+          <span class="sub">last 60</span>
+        </div>
+        <div id="chart" aria-label="TTFT bars"></div>
+        <div class="chart-stats">
+          <span>min <b id="ttftMin">—</b></span>
+          <span>avg <b id="ttftAvg">—</b></span>
+          <span>max <b id="ttftMax">—</b></span>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
-    const state = { hits: 0, misses: 0, n: 0, lastId: 0, es: null, ttfts: [] };
+    const WORKER_COLORS = ["#2dd4bf", "#a78bfa", "#fb923c", "#60a5fa", "#f472b6", "#a3e635", "#f87171", "#facc15"];
+    const SIGNAL_COLOR = { hit: "var(--hit)", miss: "var(--miss)", hit_broken: "var(--gate)" };
+    const LANE_MAX = 42;
+    const TTFT_MAX = 60;
+    const LOG_MAX = 120;
+
+    const state = {
+      es: null,
+      lastId: 0,
+      n: 0,
+      hits: 0,
+      misses: 0,
+      gates: 0,
+      strategy: "",
+      workers: new Map(), // id -> { color, served, hits, misses, gates, ticks: [] }
+      workerOrder: [],
+      ttfts: [], // { v, sig }
+    };
 
     function tick() {
       document.getElementById("clock").textContent = new Date().toISOString();
@@ -127,48 +384,168 @@
     setInterval(tick, 250);
     tick();
 
+    function setStatus(s) {
+      document.getElementById("status").textContent = s;
+      const pill = document.getElementById("statusPill");
+      pill.className = "pill " + s;
+    }
+
+    function colorFor(sig) {
+      if (sig === "hit") return "var(--hit)";
+      if (sig === "miss") return "var(--miss)";
+      if (sig === "hit_broken") return "var(--gate)";
+      return "var(--na)";
+    }
+
+    function workerFor(id) {
+      if (!state.workers.has(id)) {
+        const color = WORKER_COLORS[state.workerOrder.length % WORKER_COLORS.length];
+        state.workers.set(id, { color, served: 0, hits: 0, misses: 0, gates: 0, ticks: [] });
+        state.workerOrder.push(id);
+      }
+      return state.workers.get(id);
+    }
+
+    function renderLanes() {
+      const el = document.getElementById("lanes");
+      if (state.workerOrder.length === 0) return;
+      el.innerHTML = "";
+      const totalServed = state.workerOrder.reduce((a, id) => a + state.workers.get(id).served, 0) || 1;
+      for (const id of state.workerOrder) {
+        const w = state.workers.get(id);
+        const row = document.createElement("div");
+        row.className = "lane";
+
+        const label = document.createElement("div");
+        label.className = "lane-label";
+        label.innerHTML = '<i style="background:' + w.color + '"></i><span>' + id + "</span>";
+
+        const track = document.createElement("div");
+        track.className = "track";
+        for (const t of w.ticks.slice(-LANE_MAX)) {
+          const tk = document.createElement("div");
+          tk.className = "tick";
+          tk.style.background = colorFor(t);
+          tk.title = t;
+          track.appendChild(tk);
+        }
+
+        const denom = w.hits + w.misses + w.gates;
+        const hitPct = denom > 0 ? Math.round((w.hits / denom) * 100) + "%" : "—";
+        const stat = document.createElement("div");
+        stat.className = "lane-stat";
+        stat.textContent = w.served + " · " + hitPct;
+
+        row.appendChild(label);
+        row.appendChild(track);
+        row.appendChild(stat);
+        el.appendChild(row);
+      }
+
+      const skewPct = Math.round((Math.max(...state.workerOrder.map((id) => state.workers.get(id).served)) / totalServed) * 100);
+      document.getElementById("skew").textContent = state.workerOrder.length > 1 || state.n > 0 ? skewPct + "%" : "—";
+      document.getElementById("nWorkers").textContent = String(state.workerOrder.length);
+    }
+
     function renderChart() {
       const el = document.getElementById("chart");
       el.innerHTML = "";
-      const vals = state.ttfts.slice(-60);
-      const max = Math.max(1, ...vals);
+      const vals = state.ttfts.slice(-TTFT_MAX);
+      const nums = vals.map((v) => v.v);
+      const max = Math.max(1, ...nums);
       for (const v of vals) {
         const bar = document.createElement("i");
-        bar.style.height = Math.max(4, (v / max) * 64) + "px";
-        bar.title = v + " ms";
+        bar.style.height = Math.max(4, (v.v / max) * 66) + "px";
+        bar.style.background = colorFor(v.sig);
+        bar.title = v.v + " ms (" + v.sig + ")";
         el.appendChild(bar);
       }
+      if (nums.length) {
+        document.getElementById("ttftMin").textContent = Math.min(...nums).toFixed(0);
+        document.getElementById("ttftMax").textContent = Math.max(...nums).toFixed(0);
+        document.getElementById("ttftAvg").textContent = (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(0);
+      }
+    }
+
+    function formatSignal(sig) {
+      if (sig === "hit") return { cls: "hit", label: "HIT" };
+      if (sig === "miss") return { cls: "miss", label: "MISS" };
+      if (sig === "hit_broken") return { cls: "gate", label: "GATE" };
+      return { cls: "na", label: "n/a" };
+    }
+
+    function formatReason(reason, sig) {
+      if (!reason) return "—";
+      // Already humanized by router; keep as-is, just trim noise.
+      return String(reason).replace(/\s+/g, " ").trim();
+    }
+
+    function formatMs(v) {
+      if (v == null || Number.isNaN(Number(v))) return "—";
+      const n = Number(v);
+      if (n < 10) return n.toFixed(1) + " ms";
+      return Math.round(n) + " ms";
+    }
+
+    function formatTok(v) {
+      if (v == null || Number.isNaN(Number(v))) return "—";
+      const n = Number(v);
+      if (n <= 0) return "—";
+      return n >= 100 ? Math.round(n).toString() : n.toFixed(1);
     }
 
     function addEvent(ev) {
       if (!ev || ev.id <= state.lastId) return;
       state.lastId = ev.id;
       state.n += 1;
-      if (ev.cache_signal === "hit") state.hits += 1;
-      if (ev.cache_signal === "miss") state.misses += 1;
+
+      const sig = ev.cache_signal || "n/a";
+      if (sig === "hit") state.hits += 1;
+      if (sig === "miss") state.misses += 1;
+      if (sig === "hit_broken") state.gates += 1;
+      if (ev.strategy) state.strategy = ev.strategy;
+
+      const w = workerFor(ev.worker_id || "unknown");
+      w.served += 1;
+      if (sig === "hit") w.hits += 1;
+      if (sig === "miss") w.misses += 1;
+      if (sig === "hit_broken") w.gates += 1;
+      w.ticks.push(sig);
+      if (w.ticks.length > LANE_MAX) w.ticks.shift();
+
       document.getElementById("nEvents").textContent = String(state.n);
-      document.getElementById("nHits").textContent = String(state.hits);
-      document.getElementById("nMisses").textContent = String(state.misses);
+      document.getElementById("nGate").textContent = String(state.gates);
+      document.getElementById("strategyTag").textContent = "strategy: " + (state.strategy || "—");
+      const signalTotal = state.hits + state.misses + state.gates;
+      document.getElementById("hitRate").textContent = signalTotal > 0 ? Math.round((state.hits / signalTotal) * 100) + "%" : "—";
+
+      renderLanes();
 
       if (ev.ttft_ms != null) {
-        state.ttfts.push(Number(ev.ttft_ms));
+        state.ttfts.push({ v: Number(ev.ttft_ms), sig });
+        if (state.ttfts.length > TTFT_MAX) state.ttfts.shift();
         renderChart();
       }
 
       const tr = document.createElement("tr");
-      const t = new Date((ev.ts || 0) * 1000).toISOString().slice(11, 23);
-      const cacheClass = ev.cache_signal === "hit" ? "hit" : (ev.cache_signal === "miss" ? "miss" : "");
+      if (sig === "hit_broken") tr.className = "gate";
+      const t = new Date((ev.ts || 0) * 1000);
+      const timeStr = t.toLocaleTimeString(undefined, {
+        hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit",
+      }) + "." + String(t.getMilliseconds()).padStart(3, "0");
+      const signal = formatSignal(sig);
+      const strategy = (ev.strategy || "—").replace(/_/g, " ");
       tr.innerHTML =
-        "<td>" + t + "</td>" +
-        "<td>" + (ev.worker_id || "") + "</td>" +
-        "<td>" + (ev.strategy || "") + "</td>" +
-        "<td class=\"" + cacheClass + "\">" + (ev.cache_signal || "") + "</td>" +
-        "<td>" + (ev.ttft_ms != null ? Number(ev.ttft_ms).toFixed(1) : "—") + "</td>" +
-        "<td>" + (ev.tokens_per_s != null ? Number(ev.tokens_per_s).toFixed(1) : "—") + "</td>" +
-        "<td>" + (ev.reason || "") + "</td>";
+        '<td class="time">' + timeStr + "</td>" +
+        '<td class="worker">' + (ev.worker_id || "—") + "</td>" +
+        "<td>" + strategy + "</td>" +
+        '<td><span class="sig ' + signal.cls + '">' + signal.label + "</span></td>" +
+        '<td class="num">' + formatMs(ev.ttft_ms) + "</td>" +
+        '<td class="num">' + formatTok(ev.tokens_per_s) + "</td>" +
+        '<td class="reason">' + formatReason(ev.reason, sig) + "</td>";
       const body = document.getElementById("tbody");
       body.insertBefore(tr, body.firstChild);
-      while (body.children.length > 80) body.removeChild(body.lastChild);
+      while (body.children.length > LOG_MAX) body.removeChild(body.lastChild);
     }
 
     async function bootstrap(key) {
@@ -183,23 +560,55 @@
       const url = "/atlas/events?api_key=" + encodeURIComponent(key) + "&after=" + state.lastId;
       const es = new EventSource(url);
       state.es = es;
-      document.getElementById("status").textContent = "connecting";
-      es.onopen = () => { document.getElementById("status").textContent = "live"; };
-      es.onerror = () => { document.getElementById("status").textContent = "reconnecting"; };
+      setStatus("connecting");
+      es.onopen = () => setStatus("live");
+      es.onerror = () => setStatus("reconnecting");
       es.onmessage = (msg) => {
         try { addEvent(JSON.parse(msg.data)); } catch (_) {}
       };
     }
 
-    document.getElementById("connectBtn").onclick = async () => {
+    async function doConnect() {
       const key = document.getElementById("apiKey").value.trim();
       try {
         await bootstrap(key);
         connectSse(key);
+        document.body.classList.add("is-connected");
+        const masked = key.length > 6 ? key.slice(0, 3) + "····" + key.slice(-3) : key;
+        document.getElementById("connChipKey").textContent = masked;
       } catch (e) {
-        document.getElementById("status").textContent = String(e.message || e);
+        setStatus(String(e.message || e));
       }
+    }
+
+    document.getElementById("connectBtn").onclick = doConnect;
+    document.getElementById("apiKey").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") doConnect();
+    });
+    document.getElementById("changeKeyBtn").onclick = () => {
+      document.body.classList.remove("is-connected");
+      document.getElementById("apiKey").focus();
     };
+
+    const honestyBtn = document.getElementById("honestyBtn");
+    const honestyPop = document.getElementById("honestyPop");
+    honestyBtn.onclick = (e) => {
+      e.stopPropagation();
+      const open = honestyPop.classList.toggle("open");
+      honestyBtn.setAttribute("aria-expanded", String(open));
+    };
+    document.addEventListener("click", (e) => {
+      if (!honestyPop.contains(e.target) && e.target !== honestyBtn) {
+        honestyPop.classList.remove("open");
+        honestyBtn.setAttribute("aria-expanded", "false");
+      }
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        honestyPop.classList.remove("open");
+        honestyBtn.setAttribute("aria-expanded", "false");
+      }
+    });
   </script>
 </body>
 </html>

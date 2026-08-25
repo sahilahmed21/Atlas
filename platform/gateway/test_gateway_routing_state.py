@@ -143,7 +143,8 @@ def test_prefix_aware_load_gate_breaks_sticky_under_served_pressure(tmp_path: Pa
     # served[owner]=1, alt=0, margin=1 → break on second request
     assert r2.headers["x-atlas-cache-signal"] == "hit_broken"
     assert r2.headers["x-atlas-worker-id"] != owner
-    assert "load_gate" in r2.headers["x-atlas-route-reason"].lower()
+    reason = r2.headers["x-atlas-route-reason"].lower()
+    assert "gate" in reason and "sticky break" in reason
 
 
 def test_loads_return_to_zero_after_non_stream(tmp_path: Path):
