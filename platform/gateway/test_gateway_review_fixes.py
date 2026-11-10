@@ -55,15 +55,15 @@ def test_worker_http_error_returns_openai_shaped_502(tmp_path: Path):
     from app import create_app
 
     class BoomWorker:
-        last_timings = {"status": "error", "completion_ms": 1.0}
-
-        def chat_completions(self, payload):
+        async def chat_completions(self, payload, stats):
             req = httpx.Request("POST", "http://fake/v1/chat/completions")
             resp = httpx.Response(503, request=req, json={"error": {"message": "down"}})
+            stats.update(status="error", completion_ms=1.0)
             raise httpx.HTTPStatusError("down", request=req, response=resp)
 
-        def stream_chat_completions(self, payload):
+        async def stream_chat_completions(self, payload, stats):
             raise AssertionError("not used")
+            yield  # pragma: no cover - makes this an async generator
 
     app = create_app(
         tenants_path=_tenants(tmp_path / "t.yaml"),
@@ -87,15 +87,11 @@ def test_metrics_requires_auth(tmp_path: Path):
     from atlas_metrics import AtlasMetrics
 
     class OkWorker:
-        last_timings = {
-            "request_id": "x",
-            "ttft_ms": None,
-            "completion_ms": 1.0,
-            "status": "ok",
-            "tokens_per_s": None,
-        }
-
-        def chat_completions(self, payload):
+        async def chat_completions(self, payload, stats):
+            stats.update(
+                request_id="x", ttft_ms=None, completion_ms=1.0,
+                status="ok", tokens_per_s=None,
+            )
             return {
                 "id": "x",
                 "object": "chat.completion",
@@ -108,7 +104,7 @@ def test_metrics_requires_auth(tmp_path: Path):
                 ],
             }
 
-        def stream_chat_completions(self, payload):
+        async def stream_chat_completions(self, payload, stats):
             yield "data: [DONE]\n\n"
 
     app = create_app(
@@ -131,10 +127,10 @@ def test_invalid_json_body_returns_400_openai_shape(tmp_path: Path):
     from app import create_app
 
     class OkWorker:
-        def chat_completions(self, payload):
+        async def chat_completions(self, payload, stats):
             return {"id": "x", "object": "chat.completion", "choices": []}
 
-        def stream_chat_completions(self, payload):
+        async def stream_chat_completions(self, payload, stats):
             yield "data: [DONE]\n\n"
 
     app = create_app(
@@ -183,15 +179,11 @@ def test_client_cache_reuses_same_instance(tmp_path: Path):
     created = []
 
     class OkWorker:
-        last_timings = {
-            "request_id": "x",
-            "ttft_ms": None,
-            "completion_ms": 1.0,
-            "status": "ok",
-            "tokens_per_s": None,
-        }
-
-        def chat_completions(self, payload):
+        async def chat_completions(self, payload, stats):
+            stats.update(
+                request_id="x", ttft_ms=None, completion_ms=1.0,
+                status="ok", tokens_per_s=None,
+            )
             return {
                 "id": "x",
                 "object": "chat.completion",
@@ -204,10 +196,10 @@ def test_client_cache_reuses_same_instance(tmp_path: Path):
                 ],
             }
 
-        def stream_chat_completions(self, payload):
+        async def stream_chat_completions(self, payload, stats):
             yield "data: [DONE]\n\n"
 
-        def close(self):
+        async def close(self):
             pass
 
     def factory(url):

@@ -1,6 +1,6 @@
-# Hire-signal arc — Phases 7–10
+# Validation arc — Phases 7–10
 
-**Purpose:** Turn the completed free-path MVP (Phases 0–6) into a **30 LPA+ outshiner**: GPU-backed surprise, load-gate fix, 90s demo, public package.  
+**Purpose:** Validate the completed free-path MVP (Phases 0–6) on GPU hardware, add the load-gate variant, record a 90s demo and publish the package.  
 **Rule:** no DistServe/RDMA theater; every public number stays inventory-backed.  
 **Order is strict:** 7 → 8 → 9. Phase 10 is optional and must not dilute 7–9.
 
@@ -25,7 +25,7 @@ You can say, with file paths:
 
 > On dual vLLM workers I measured high prefix reuse making sticky cache-aware routing worse on TTFT than round-robin despite high hit rate; I added a TTFT load gate that recovered latency while preserving hits; here is the 90s demo and CSV.
 
-Until Phase 7 + 9 exist, do **not** market Atlas as the outshiner.
+Until Phase 7 + 9 exist, do **not** present these results as established findings.
 
 ## Honesty carry-forward
 

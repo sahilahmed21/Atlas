@@ -41,16 +41,13 @@ class FakeWorkerClient:
 
     def __init__(self):
         self.calls: list[dict] = []
-        self.last_timings = {
-            "request_id": "chatcmpl-fake",
-            "ttft_ms": None,
-            "completion_ms": 1.0,
-            "status": "ok",
-            "tokens_per_s": None,
-        }
 
-    def chat_completions(self, payload: dict) -> dict:
+    async def chat_completions(self, payload: dict, stats: dict) -> dict:
         self.calls.append(payload)
+        stats.update(
+            request_id="chatcmpl-fake", ttft_ms=None, completion_ms=1.0,
+            status="ok", tokens_per_s=None,
+        )
         return {
             "id": "chatcmpl-fake",
             "object": "chat.completion",
@@ -64,21 +61,18 @@ class FakeWorkerClient:
             ],
         }
 
-    def stream_chat_completions(self, payload: dict):
+    async def stream_chat_completions(self, payload: dict, stats: dict):
         self.calls.append(payload)
-        self.last_timings = {
-            "request_id": "chatcmpl-fake",
-            "ttft_ms": 1.0,
-            "completion_ms": 2.0,
-            "status": "ok",
-            "tokens_per_s": None,
-        }
         yield (
             'data: {"id":"chatcmpl-fake","object":"chat.completion.chunk",'
             '"choices":[{"index":0,"delta":{"content":"hello from fake"},'
             '"finish_reason":"stop"}]}\n\n'
         )
         yield "data: [DONE]\n\n"
+        stats.update(
+            request_id="chatcmpl-fake", ttft_ms=1.0, completion_ms=2.0,
+            status="ok", tokens_per_s=None,
+        )
 
 
 def _client(tmp_path: Path, fake: FakeWorkerClient | None = None, strategy: str = "round_robin"):

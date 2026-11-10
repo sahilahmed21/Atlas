@@ -36,8 +36,12 @@ class FakeWorker:
     def __init__(self):
         self.calls = []
 
-    def chat_completions(self, payload):
+    async def chat_completions(self, payload, stats):
         self.calls.append(payload)
+        stats.update(
+            request_id="chatcmpl-fake", ttft_ms=None, completion_ms=1.0,
+            status="ok", tokens_per_s=None,
+        )
         return {
             "id": "chatcmpl-fake",
             "object": "chat.completion",
@@ -50,8 +54,9 @@ class FakeWorker:
             ],
         }
 
-    def stream_chat_completions(self, payload):
+    async def stream_chat_completions(self, payload, stats):
         raise AssertionError("non-stream test")
+        yield  # pragma: no cover - makes this an async generator
 
 
 def test_third_request_returns_429_with_rpm_scope(tmp_path: Path):

@@ -38,16 +38,13 @@ def _workers_yaml(path: Path) -> Path:
 class FakeWorkerClient:
     def __init__(self):
         self.calls: list[dict] = []
-        self.last_timings = {
-            "request_id": "chatcmpl-fake",
-            "ttft_ms": None,
-            "completion_ms": 1.0,
-            "status": "ok",
-            "tokens_per_s": None,
-        }
 
-    def chat_completions(self, payload: dict) -> dict:
+    async def chat_completions(self, payload: dict, stats: dict) -> dict:
         self.calls.append(payload)
+        stats.update(
+            request_id="chatcmpl-fake", ttft_ms=None, completion_ms=1.0,
+            status="ok", tokens_per_s=None,
+        )
         return {
             "id": "chatcmpl-fake",
             "object": "chat.completion",
@@ -61,21 +58,18 @@ class FakeWorkerClient:
             ],
         }
 
-    def stream_chat_completions(self, payload: dict):
+    async def stream_chat_completions(self, payload: dict, stats: dict):
         self.calls.append(payload)
-        self.last_timings = {
-            "request_id": "chatcmpl-fake",
-            "ttft_ms": 1.0,
-            "completion_ms": 2.0,
-            "status": "ok",
-            "tokens_per_s": None,
-        }
         yield (
             'data: {"id":"chatcmpl-fake","object":"chat.completion.chunk",'
             '"choices":[{"index":0,"delta":{"content":"ok"},'
             '"finish_reason":"stop"}]}\n\n'
         )
         yield "data: [DONE]\n\n"
+        stats.update(
+            request_id="chatcmpl-fake", ttft_ms=1.0, completion_ms=2.0,
+            status="ok", tokens_per_s=None,
+        )
 
 
 def _app(
@@ -186,17 +180,13 @@ def test_in_flight_load_visible_during_slow_upstream(tmp_path: Path):
     seen: dict[str, int] = {}
 
     class SlowFake:
-        last_timings = {
-            "request_id": "chatcmpl-slow",
-            "ttft_ms": None,
-            "completion_ms": 1.0,
-            "status": "ok",
-            "tokens_per_s": None,
-        }
-
-        def chat_completions(self, payload: dict) -> dict:
+        async def chat_completions(self, payload: dict, stats: dict) -> dict:
             # Capture loads mid-request via closure on app — set after create
             seen.update(dict(app.state.loads))
+            stats.update(
+                request_id="chatcmpl-slow", ttft_ms=None, completion_ms=1.0,
+                status="ok", tokens_per_s=None,
+            )
             return {
                 "id": "chatcmpl-slow",
                 "object": "chat.completion",

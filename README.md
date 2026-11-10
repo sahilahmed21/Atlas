@@ -1,12 +1,39 @@
 # Atlas
 
-**Multi-tenant LLM inference control plane on free-path GPUs** — an OpenAI-compatible gateway with cache-aware routing, measured end-to-end on a laptop RTX 3050 (4 GiB) and Colab T4. Not a Kubernetes / multi-node / RDMA claim.
+**An OpenAI-compatible LLM gateway that records agent runs, replays them byte-for-byte, injects seeded faults, and measures agent reliability with pass^k.** It sits on the LLM call path, so every model call an agent makes can be captured, replayed without the model, and perturbed reproducibly. Underneath is the multi-tenant serving substrate (routing, rate limits, metrics) the project started as.
 
-[Demo video](docs/demo/atlas-demo.mp4) · [Measured results](results/) · [Architecture](docs/architecture/MVP_ARCHITECTURE.md) · [What shipped](docs/GOALS_AND_SUCCESS.md)
+[Agent recorder docs](docs/AGENT_RECORDER.md) · [Substrate results](results/) · [Architecture](docs/architecture/MVP_ARCHITECTURE.md) · [What shipped](docs/GOALS_AND_SUCCESS.md)
 
 ---
 
-## At a glance
+## Agent flight recorder + eval harness
+
+Try it in one command (no API key; it uses a scripted offline model, so it demonstrates the machinery, not any real LLM):
+
+```powershell
+python evals/demo.py
+```
+
+What it does: runs 16 SQL-agent tasks x 6 trials through the gateway in **record** mode, **replays** all 96 trials with the model forbidden (identical outcomes, 0 model calls), then shows the **regression gate** failing a degraded candidate and bisecting the first differing step.
+
+| Capability | How |
+| --- | --- |
+| Record | `x-atlas-mode: record` + `x-atlas-run-id` + `x-atlas-step`; one immutable SQLite row per step (request hash, exact response bytes, tokens, timings), tenant-namespaced |
+| Replay | `x-atlas-mode: replay`; fail-closed (never calls a worker); `409 replay_divergence` names the first step whose request changed |
+| Faults | `x-atlas-fault-seed` / `-rate`: `fault_for(seed, step)` is a pure function; applied faults are recorded, so replay needs no seed |
+| Reliability | `evals/`: pass@1 vs **pass^k** with task-level bootstrap CIs, flaky-task list, failure tags, per-step cost/latency, paired regression gate |
+
+What is and is not established:
+
+- **Tested:** byte-identical replay (100 replays, upstream forbidden), same-seed determinism, 50 concurrent runs with no cross-contamination, restart-safe storage, tenant isolation, duplicate and conflicting step handling. 164 tests.
+- **Measured (in-process, instant upstream, no network):** recording adds about +0.7 ms for one run, +37 ms at 10 concurrent runs and +105 ms at 50 (single SQLite writer queue). Details in [docs/AGENT_RECORDER.md](docs/AGENT_RECORDER.md).
+- **Not done:** no real-model eval results yet (the provider spike for tool calling and temperature-0 variance is still open), no LLM judge, no hand-labeled failure taxonomy, no sandbox comparison. The demo's pass@1 / pass^k come from the scripted model.
+
+---
+
+## Serving substrate
+
+**Multi-tenant LLM inference control plane on free-path GPUs**: cache-aware routing measured on a laptop RTX 3050 (4 GiB) and Colab T4. Not a Kubernetes / multi-node / RDMA claim. The results below are **inconclusive substrate experiments**, labeled as such. [Demo video](docs/demo/atlas-demo.mp4)
 
 | | |
 | --- | --- |
@@ -17,7 +44,7 @@
 | **Honesty** | Simulation ≠ GPU. Router affinity ≠ engine APC. Process-local RPM/events. No DistServe/RDMA theater. |
 
 ```text
-Client ──► Gateway (auth · RPM · route) ──► Worker A / Worker B (OpenAI HTTP)
+Client ──► Gateway (auth · RPM · route · record/replay) ──► Worker A / Worker B (OpenAI HTTP)
                 │
                 └── observe_request ──► Prometheus + SSE event ring ──► /dashboard/
 ```
@@ -65,7 +92,7 @@ uv run python benchmarks/demo_load.py
 # or: uv run python benchmarks/run_routing_matrix.py --n 24
 ```
 
-**Health:** `GET /healthz` · **Metrics:** `GET /metrics` (Bearer) · **Events:** `GET /atlas/events?api_key=sk-atlas-demo-key`
+**Health:** `GET /healthz` · **Metrics:** `GET /metrics` (Bearer) · **Events:** `GET /atlas/events` (Bearer; own tenant's events only). The dashboard's EventSource cannot send headers, so for the demo set `$env:ATLAS_ALLOW_QUERY_KEY = "1"` to accept `?api_key=` (off by default)
 
 Live GPU path (Colab dual vLLM): [docs/runbooks/COLAB_KAGGLE.md](docs/runbooks/COLAB_KAGGLE.md) · Phase 7 notes under `docs/phases/phase-7/`.
 
@@ -77,9 +104,9 @@ Live GPU path (Colab dual vLLM): [docs/runbooks/COLAB_KAGGLE.md](docs/runbooks/C
 | --- | --- |
 | **Naive HF cliff** — Qwen2.5-0.5B on RTX 3050: N=8 p50 **9242 ms** ≈ **5.5×** N=1 (**1671 ms**); peak VRAM ~1.04 GiB (torch) | [results/phase1/](results/phase1/) |
 | **vLLM on T4** — pin **0.26.0**; batch wall ~210–266 ms N=1..8; ~15 GB NVML (KV prealloc). Overlay vs Phase 1 is **cross-hardware** | [results/phase3/](results/phase3/) |
-| **Sim surprise** — high_reuse sticky routing: hit% **95.8**, skew **1.0**, TTFT p50 **2×** worse than round-robin (`worker_mode=simulated`) | [results/phase5/SURPRISE.md](results/phase5/SURPRISE.md) |
-| **Live dual vLLM** — same affinity pattern; sticky ~**1.17×** p50 vs RR → verdict **WEAKENED** (not a confirmed 2× GPU cliff) | [results/phase5-live/SURPRISE_GPU.md](results/phase5-live/SURPRISE_GPU.md) |
-| **Load gate** — sim recovers sticky cliff to RR-class; live confirms break mechanics (`hit_broken` 50%, skew 0.5); **live TTFT win vs sticky not claimed** that run | [results/phase8/BEFORE_AFTER.md](results/phase8/BEFORE_AFTER.md) |
+| **Toy-model illustration** — in the simulator, high_reuse sticky routing: hit% **95.8**, skew **1.0**, TTFT p50 **2×** worse than round-robin. The 2× follows from the simulator's own latency formula (`benchmarks/fake_worker.py`): it illustrates the mechanism and is **not evidence** (`worker_mode=simulated`) | [results/phase5/SURPRISE.md](results/phase5/SURPRISE.md) |
+| **Live dual vLLM — inconclusive** — affinity works (hit% 95.8); sticky p50 ~**1.17×** vs RR in Phase 7 but faster in Phase 8. n=24, sequential requests, one run each, no variance estimate: the TTFT difference cannot be distinguished from noise | [results/phase5-live/SURPRISE_GPU.md](results/phase5-live/SURPRISE_GPU.md) |
+| **Served-count balancer** (`ATLAS_PREFIX_LOAD_MARGIN`) — adds cumulative served counts to in-flight load, so with margin 1 it behaves like a request-count balancer (the sim row equals round-robin). Not a load-pressure signal; live TTFT win **not claimed** | [results/phase8/BEFORE_AFTER.md](results/phase8/BEFORE_AFTER.md) |
 
 Claim rules: [docs/phases/phase-6/CLAIM_INVENTORY.md](docs/phases/phase-6/CLAIM_INVENTORY.md)
 
@@ -104,7 +131,8 @@ Status checklist and phase index: [docs/phases/README.md](docs/phases/README.md)
 
 ```text
 fundamentals/   # Phase 1–2 experiments + CPU sims
-platform/       # gateway, tenant, router, registry, observability
+platform/       # gateway, tenant, router, registry, observability, recorder
+evals/          # SQL-agent eval harness: tasks, agent, runner, pass^k report, regression gate
 workers/        # OpenAI worker client (no tenant logic)
 benchmarks/     # routing matrix + demo load
 dashboard/      # static live UI
@@ -119,7 +147,7 @@ docs/demo/      # demo recording
 ## Tests
 
 ```powershell
-uv run pytest platform workers benchmarks -q
+uv run pytest platform workers benchmarks evals -q
 ```
 
 ---

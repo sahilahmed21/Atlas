@@ -38,6 +38,15 @@ Gate for pitch / README / resume. Every public number must appear here as **allo
 | Multi-replica-safe RPM / queue / events | Process-local |
 | KEDA as a live cluster | `deploy/keda/` is a planning sketch |
 
+## Measurement definitions (changed 2026-11)
+
+| Metric | Definition now | Not comparable with |
+| --- | --- | --- |
+| `atlas_ttft_ms` / event `ttft_ms` (streaming) | Time to the first stream chunk carrying `content` or `tool_calls` | Phase 7/8 CSVs, which timed the first `data:` line (possibly a role-only chunk) |
+| Live routing results (Phase 7/8) | n=24, sequential requests, one run each, no variance estimate: inconclusive | Any ranking of strategies |
+| Sim "2x sticky penalty" | Follows from the latency formula in `benchmarks/fake_worker.py`; illustration only | Evidence about real GPUs |
+| Prefix "load gate" | Cumulative served counts + in-flight load; a served-count balancer, not a load-pressure signal | llm-d load scorers |
+
 ## Future work (say so; do not present as done)
 
 | Topic | Wording | Link |

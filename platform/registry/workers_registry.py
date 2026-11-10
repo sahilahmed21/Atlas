@@ -13,6 +13,8 @@ class Worker:
     id: str
     model: str
     base_url: str
+    # Name of the env var holding the upstream API key; the secret itself is never stored here.
+    api_key_env: str | None = None
 
 
 def load_workers(path: str | Path) -> list[Worker]:
@@ -24,6 +26,7 @@ def load_workers(path: str | Path) -> list[Worker]:
                 id=str(row["id"]),
                 model=str(row["model"]),
                 base_url=str(row["base_url"]).rstrip("/"),
+                api_key_env=str(row["api_key_env"]) if row.get("api_key_env") else None,
             )
         )
     return out

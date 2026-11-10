@@ -35,16 +35,13 @@ def _workers_yaml(path: Path) -> Path:
 
 
 class FakeWorkerClient:
-    def __init__(self):
-        self.last_timings = {
-            "request_id": "chatcmpl-fake",
-            "ttft_ms": 11.0,
-            "completion_ms": 22.0,
-            "status": "ok",
-            "tokens_per_s": 50.0,
-        }
+    _STATS = dict(
+        request_id="chatcmpl-fake", ttft_ms=11.0, completion_ms=22.0,
+        status="ok", tokens_per_s=50.0,
+    )
 
-    def chat_completions(self, payload: dict) -> dict:
+    async def chat_completions(self, payload: dict, stats: dict) -> dict:
+        stats.update(self._STATS)
         return {
             "id": "chatcmpl-fake",
             "object": "chat.completion",
@@ -58,9 +55,10 @@ class FakeWorkerClient:
             ],
         }
 
-    def stream_chat_completions(self, payload: dict):
+    async def stream_chat_completions(self, payload: dict, stats: dict):
         yield 'data: {"id":"x","choices":[{"delta":{"content":"ok"}}]}\n\n'
         yield "data: [DONE]\n\n"
+        stats.update(self._STATS)
 
 
 def _client(tmp_path: Path, strategy: str = "round_robin") -> TestClient:
@@ -71,6 +69,7 @@ def _client(tmp_path: Path, strategy: str = "round_robin") -> TestClient:
         workers_path=_workers_yaml(tmp_path / "workers.yaml"),
         strategy=strategy,
         worker_client_factory=lambda _url: FakeWorkerClient(),
+        allow_query_key=True,  # these tests cover the dashboard's EventSource demo mode
     )
     return TestClient(app)
 

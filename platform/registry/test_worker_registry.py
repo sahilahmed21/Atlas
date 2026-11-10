@@ -37,6 +37,24 @@ def test_resolve_workers_by_model(tmp_path: Path):
     assert [w.id for w in matched] == ["worker-a", "worker-b"]
 
 
+def test_api_key_env_is_parsed_and_optional(tmp_path: Path):
+    from workers_registry import load_workers
+
+    p = tmp_path / "workers.yaml"
+    p.write_text(
+        "workers:\n"
+        "  - id: hosted\n    model: m\n    base_url: https://api.example/v1\n"
+        "    api_key_env: HOSTED_KEY\n"
+        "  - id: local\n    model: m\n    base_url: http://127.0.0.1:8001/v1\n",
+        encoding="utf-8",
+    )
+
+    hosted, local = load_workers(p)
+
+    assert hosted.api_key_env == "HOSTED_KEY"
+    assert local.api_key_env is None
+
+
 def test_resolve_unknown_model_returns_empty(tmp_path: Path):
     from workers_registry import load_workers, resolve_workers
 

@@ -33,18 +33,17 @@ def _workers(path: Path) -> Path:
 
 
 class StreamFakeWorker:
+    _STATS = dict(
+        request_id="chatcmpl-up", ttft_ms=5.0, completion_ms=15.0,
+        status="ok", tokens_per_s=None,
+    )
+
     def __init__(self):
         self.calls = []
-        self.last_timings = {
-            "request_id": "chatcmpl-up",
-            "ttft_ms": 5.0,
-            "completion_ms": 15.0,
-            "status": "ok",
-            "tokens_per_s": None,
-        }
 
-    def chat_completions(self, payload):
+    async def chat_completions(self, payload, stats):
         self.calls.append(("json", payload))
+        stats.update(self._STATS)
         return {
             "id": "chatcmpl-up",
             "object": "chat.completion",
@@ -57,8 +56,9 @@ class StreamFakeWorker:
             ],
         }
 
-    def stream_chat_completions(self, payload):
+    async def stream_chat_completions(self, payload, stats):
         self.calls.append(("stream", payload))
+        stats.update(self._STATS)
         yield 'data: {"id":"chatcmpl-up","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"hel"}}]}\n\n'
         yield 'data: {"id":"chatcmpl-up","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"lo"},"finish_reason":"stop"}]}\n\n'
         yield "data: [DONE]\n\n"

@@ -31,13 +31,6 @@ class SimulatedWorkerClient:
         self.queue_penalty_ms = queue_penalty_ms
         self._warm: set[str] = set()
         self._served = 0
-        self.last_timings: dict[str, Any] = {
-            "request_id": f"chatcmpl-{worker_id}",
-            "ttft_ms": None,
-            "completion_ms": None,
-            "status": "ok",
-            "tokens_per_s": None,
-        }
 
     def _ttft_ms(self, messages: list[dict[str, Any]]) -> tuple[float, str]:
         key = shared_prefix_key(messages)
@@ -48,21 +41,24 @@ class SimulatedWorkerClient:
         ttft = base + self.queue_penalty_ms * pressure
         return ttft, key
 
-    def chat_completions(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def chat_completions(
+        self, payload: dict[str, Any], stats: dict[str, Any]
+    ) -> dict[str, Any]:
         messages = payload.get("messages") or []
         ttft, key = self._ttft_ms(messages)
         completion = ttft + 5.0
-        self.last_timings = {
-            "request_id": f"chatcmpl-{self.worker_id}-{self._served}",
-            "ttft_ms": ttft,
-            "completion_ms": completion,
-            "status": "ok",
-            "tokens_per_s": 1000.0 / completion if completion else None,
-        }
+        request_id = f"chatcmpl-{self.worker_id}-{self._served}"
+        stats.update(
+            request_id=request_id,
+            ttft_ms=ttft,
+            completion_ms=completion,
+            status="ok",
+            tokens_per_s=1000.0 / completion if completion else None,
+        )
         self._warm.add(key)
         self._served += 1
         return {
-            "id": self.last_timings["request_id"],
+            "id": request_id,
             "object": "chat.completion",
             "model": payload.get("model", "simulated"),
             "choices": [
@@ -75,8 +71,8 @@ class SimulatedWorkerClient:
             "usage": {"prompt_tokens": 8, "completion_tokens": 4, "total_tokens": 12},
         }
 
-    def stream_chat_completions(self, payload: dict[str, Any]):
-        result = self.chat_completions(payload)
+    async def stream_chat_completions(self, payload: dict[str, Any], stats: dict[str, Any]):
+        result = await self.chat_completions(payload, stats)
         yield (
             f'data: {{"id":"{result["id"]}","object":"chat.completion.chunk",'
             f'"choices":[{{"index":0,"delta":{{"content":"ok"}},'

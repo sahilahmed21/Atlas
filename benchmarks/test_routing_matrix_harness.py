@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -15,18 +16,25 @@ def test_simulated_worker_hit_faster_than_miss_and_load_penalty():
     client = SimulatedWorkerClient("worker-a", loads=loads, queue_penalty_ms=20.0)
     messages = [{"role": "system", "content": "S"}, {"role": "user", "content": "u1"}]
 
-    miss = client.chat_completions({"model": "m", "messages": messages})
-    miss_ttft = client.last_timings["ttft_ms"]
-    hit = client.chat_completions(
-        {
-            "model": "m",
-            "messages": [
-                {"role": "system", "content": "S"},
-                {"role": "user", "content": "u2"},
-            ],
-        }
+    miss_stats: dict = {}
+    hit_stats: dict = {}
+    miss = asyncio.run(
+        client.chat_completions({"model": "m", "messages": messages}, miss_stats)
     )
-    hit_ttft = client.last_timings["ttft_ms"]
+    miss_ttft = miss_stats["ttft_ms"]
+    hit = asyncio.run(
+        client.chat_completions(
+            {
+                "model": "m",
+                "messages": [
+                    {"role": "system", "content": "S"},
+                    {"role": "user", "content": "u2"},
+                ],
+            },
+            hit_stats,
+        )
+    )
+    hit_ttft = hit_stats["ttft_ms"]
 
     assert miss["object"] == "chat.completion"
     assert hit["object"] == "chat.completion"
@@ -39,10 +47,13 @@ def test_simulated_worker_hit_faster_than_miss_and_load_penalty():
         base_miss_ms=10.0,
         queue_penalty_ms=10.0,
     )
-    loaded.chat_completions(
-        {"model": "m", "messages": [{"role": "user", "content": "x"}]}
+    loaded_stats: dict = {}
+    asyncio.run(
+        loaded.chat_completions(
+            {"model": "m", "messages": [{"role": "user", "content": "x"}]}, loaded_stats
+        )
     )
-    assert loaded.last_timings["ttft_ms"] >= 10.0 + 10.0 * 5
+    assert loaded_stats["ttft_ms"] >= 10.0 + 10.0 * 5
 
 
 def test_matrix_runner_writes_csv_for_one_pattern(tmp_path: Path):
@@ -109,7 +120,7 @@ def _mock_live_factory(base_url: str):
             headers={"content-type": "text/event-stream"},
         )
 
-    http = httpx.Client(
+    http = httpx.AsyncClient(
         transport=httpx.MockTransport(handler),
         base_url=base_url,
     )
@@ -153,7 +164,7 @@ def test_live_matrix_writes_metadata_and_streaming_ttft(tmp_path: Path):
         assert row["pattern"] == "high_reuse"
         assert row["n"] == 4
         assert row["ttft_p50_ms"] is not None
-        assert float(row["ttft_p50_ms"]) >= 0.0
+        assert float(row["ttft_p50_ms"]) > 0.0  # measured streaming TTFT, not a zeroed default
         assert "SimulatedWorkerClient" not in type(
             _mock_live_factory("http://x/v1")
         ).__name__

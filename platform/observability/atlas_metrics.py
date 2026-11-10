@@ -48,11 +48,20 @@ class AtlasMetrics:
             registry=self.registry,
             buckets=(1, 5, 10, 25, 50, 100, 200, 500),
         )
+        self.recorder_errors = Counter(
+            "atlas_recorder_errors_total",
+            "Failures talking to the run recorder (a lost or unrecorded step)",
+            ["kind"],
+            registry=self.registry,
+        )
         self.queue_depth = Gauge(
             "atlas_queue_depth",
             "In-flight gateway requests (process-local)",
             registry=self.registry,
         )
+
+    def recorder_error(self, kind: str) -> None:
+        self.recorder_errors.labels(kind=kind).inc()
 
     def queue_inc(self) -> None:
         self.queue_depth.inc()

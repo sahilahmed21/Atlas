@@ -215,24 +215,11 @@ def _run_cell(
             if signal == "hit_broken":
                 broken += 1
 
-        if worker_mode == "live":
-            upstream = None
-            for url, c in clients.items():
-                if url_to_id.get(url.rstrip("/")) == wid:
-                    upstream = c
-                    break
-            if upstream is None:
-                raise RuntimeError(f"no client for worker {wid}")
-            ttfts.append(float(upstream.last_timings.get("ttft_ms") or 0.0))
-            tps = upstream.last_timings.get("tokens_per_s")
-            if tps is not None:
-                tokens.append(float(tps))
-        else:
-            sim = next(c for c in clients.values() if c.worker_id == wid)
-            ttfts.append(float(sim.last_timings.get("ttft_ms") or 0.0))
-            tps = sim.last_timings.get("tokens_per_s")
-            if tps is not None:
-                tokens.append(float(tps))
+        # Requests are sequential, so the newest gateway event is this request's own timing.
+        event = app.state.metrics.events.snapshot(limit=1)[-1]
+        ttfts.append(float(event["ttft_ms"] or 0.0))
+        if event["tokens_per_s"] is not None:
+            tokens.append(float(event["tokens_per_s"]))
 
     ttfts_sorted = sorted(ttfts)
     total = sum(worker_counts.values()) or 1

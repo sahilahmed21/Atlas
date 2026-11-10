@@ -75,19 +75,31 @@ class RequestEventLog:
             self._cv.notify_all()
             return ev
 
-    def snapshot(self, *, limit: int = 50, after: int = 0) -> list[dict[str, Any]]:
+    def snapshot(
+        self, *, limit: int = 50, after: int = 0, tenant_id: str | None = None
+    ) -> list[dict[str, Any]]:
         with self._lock:
-            rows = [e for e in self._buf if e.id > after]
+            rows = [
+                e
+                for e in self._buf
+                if e.id > after and (tenant_id is None or e.tenant_id == tenant_id)
+            ]
             if limit >= 0:
                 rows = rows[-limit:]
             return [e.as_public_dict() for e in rows]
 
-    def wait_after(self, after: int, *, timeout: float = 1.0) -> list[RequestEvent]:
+    def wait_after(
+        self, after: int, *, timeout: float = 1.0, tenant_id: str | None = None
+    ) -> list[RequestEvent]:
         """Block until a newer event exists or timeout; return events with id > after."""
         deadline = time.monotonic() + timeout
         with self._cv:
             while True:
-                newer = [e for e in self._buf if e.id > after]
+                newer = [
+                    e
+                    for e in self._buf
+                    if e.id > after and (tenant_id is None or e.tenant_id == tenant_id)
+                ]
                 if newer:
                     return list(newer)
                 remaining = deadline - time.monotonic()
